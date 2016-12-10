@@ -13,7 +13,7 @@ CTradeHandler::~CTradeHandler()
     //
 }
 
-void CTradeHandler::postToReceiver(QEvent *event)
+inline void CTradeHandler::postToReceiver(QEvent *event)
 {
     QCoreApplication::postEvent(receiver, event);
 }

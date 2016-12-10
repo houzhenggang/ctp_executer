@@ -68,7 +68,7 @@ public:
     explicit CTradeHandler(QObject *obj);
     ~CTradeHandler();
 
-    inline void postToReceiver(QEvent *event);
+    void postToReceiver(QEvent *event);
 
     void OnFrontConnected();
 
