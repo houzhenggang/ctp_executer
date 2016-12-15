@@ -24,3 +24,5 @@ DISTFILES +=
 
 unix:LIBS += "$$_PRO_FILE_PWD_/thosttraderapi.so"
 win32:LIBS += "$$_PRO_FILE_PWD_/thosttraderapi.lib"
+
+unix:QMAKE_CXXFLAGS += -std=c++11

@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <QSettings>
+#include <string>
 
 #include "ctp_executer.h"
 #include "ctp_executer_adaptor.h"
@@ -17,14 +18,14 @@
  * \brief _sleep
  * 暂停当前线程. 代码拷贝自QTestLib模块, 不要在主线程中调用.
  *
- * \param ms 暂停时长(毫秒)
+ * \param ms 暂停时长(<932毫秒)
  */
 static inline void _sleep(int ms)
 {
 #ifdef Q_OS_WIN
     Sleep(uint(ms));
 #else
-    struct timespec ts = { ms / 1000, (ms % 1000) * 1000 * 1000 };
+    struct timespec ts = { 0, (ms % 1024) * 1024 * 1024 };
     nanosleep(&ts, NULL);
 #endif
 }
@@ -169,7 +170,7 @@ void CtpExecuter::callTraderApi(Fn &traderApi, void * ptr)
 int CtpExecuter::login()
 {
     CThostFtdcReqUserLoginField reqUserLogin;
-    memset(&reqUserLogin, 0, sizeof CThostFtdcReqUserLoginField);
+    memset(&reqUserLogin, 0, sizeof (CThostFtdcReqUserLoginField));
     strcpy(reqUserLogin.BrokerID, c_brokerID);
     strcpy(reqUserLogin.UserID, c_userID);
     strcpy(reqUserLogin.Password, c_password);
@@ -190,8 +191,8 @@ int CtpExecuter::login()
  */
 int CtpExecuter::qrySettlementInfo()
 {
-    CThostFtdcQrySettlementInfoField *pInfoField = (CThostFtdcQrySettlementInfoField*) malloc(sizeof CThostFtdcQrySettlementInfoField);
-    memset(pInfoField, 0, sizeof CThostFtdcQrySettlementInfoField);
+    CThostFtdcQrySettlementInfoField *pInfoField = (CThostFtdcQrySettlementInfoField*) malloc(sizeof (CThostFtdcQrySettlementInfoField));
+    memset(pInfoField, 0, sizeof (CThostFtdcQrySettlementInfoField));
     strcpy(pInfoField->BrokerID, c_brokerID);
     strcpy(pInfoField->InvestorID, c_userID);
 
@@ -211,7 +212,7 @@ int CtpExecuter::qrySettlementInfo()
 int CtpExecuter::confirmSettlementInfo()
 {
     CThostFtdcSettlementInfoConfirmField confirmField;
-    memset(&confirmField, 0, sizeof CThostFtdcSettlementInfoConfirmField);
+    memset(&confirmField, 0, sizeof (CThostFtdcSettlementInfoConfirmField));
     strcpy(confirmField.BrokerID, c_brokerID);
     strcpy(confirmField.InvestorID, c_userID);
 
@@ -231,8 +232,8 @@ int CtpExecuter::confirmSettlementInfo()
  */
 int CtpExecuter::qrySettlementInfoConfirm()
 {
-    CThostFtdcQrySettlementInfoConfirmField *pConfirmField = (CThostFtdcQrySettlementInfoConfirmField*) malloc(sizeof CThostFtdcQrySettlementInfoConfirmField);
-    memset(pConfirmField, 0, sizeof CThostFtdcQrySettlementInfoConfirmField);
+    CThostFtdcQrySettlementInfoConfirmField *pConfirmField = (CThostFtdcQrySettlementInfoConfirmField*) malloc(sizeof (CThostFtdcQrySettlementInfoConfirmField));
+    memset(pConfirmField, 0, sizeof (CThostFtdcQrySettlementInfoConfirmField));
     strcpy(pConfirmField->BrokerID, c_brokerID);
     strcpy(pConfirmField->InvestorID, c_userID);
 
@@ -251,8 +252,8 @@ int CtpExecuter::qrySettlementInfoConfirm()
  */
 int CtpExecuter::qryTradingAccount()
 {
-    CThostFtdcQryTradingAccountField *pAccountField = (CThostFtdcQryTradingAccountField*) malloc(sizeof CThostFtdcQryTradingAccountField);
-    memset(pAccountField, 0, sizeof CThostFtdcQryTradingAccountField);
+    CThostFtdcQryTradingAccountField *pAccountField = (CThostFtdcQryTradingAccountField*) malloc(sizeof (CThostFtdcQryTradingAccountField));
+    memset(pAccountField, 0, sizeof (CThostFtdcQryTradingAccountField));
     strcpy(pAccountField->BrokerID, c_brokerID);
     strcpy(pAccountField->InvestorID, c_userID);
 
@@ -278,7 +279,7 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, double price, int v
     Q_ASSERT(price > 0.0 && volume != 0);
 
     CThostFtdcInputOrderField inputOrder;
-    memset(&inputOrder, 0, sizeof CThostFtdcInputOrderField);
+    memset(&inputOrder, 0, sizeof (CThostFtdcInputOrderField));
     strcpy(inputOrder.BrokerID, c_brokerID);
     strcpy(inputOrder.InvestorID, c_userID);
     strcpy(inputOrder.InstrumentID, instrument.toLatin1().data());
