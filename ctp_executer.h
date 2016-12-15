@@ -1,9 +1,11 @@
 #ifndef CTP_EXECUTER_H
 #define CTP_EXECUTER_H
 
-#include <QAtomicInt>
 #include <QObject>
+#include <QAtomicInt>
+#include <QByteArray>
 #include <QMap>
+#include <QMutex>
 
 class CThostFtdcTraderApi;
 class CTradeHandler;
@@ -21,15 +23,32 @@ protected:
     CThostFtdcTraderApi *pUserApi;
     CTradeHandler *pHandler;
 
+    QByteArray brokerID;
+    QByteArray userID;
+    QByteArray password;
+    char* c_brokerID;
+    char* c_userID;
+    char* c_password;
+
     int FrontID;
     int SessionID;
 
     QMap<QString, int> target_pos_map;
     QMap<QString, int> real_pos_map;
 
+    QMutex reqMutex;
+
     void customEvent(QEvent *event);
 
-    void login();
+    template<typename Fn>
+    void callTraderApi(Fn &callApi, void * ptr);
+
+    int login();
+    int qrySettlementInfo();
+    int confirmSettlementInfo();
+    int qrySettlementInfoConfirm();
+    int qryTradingAccount();
+    int insertLimitOrder(const QString &instrument, double price, int volume, bool open);
 
 signals:
 
@@ -37,7 +56,7 @@ public slots:
      // int getTimeDiff(int id);  //shijiancha id = 0, 1, 2, 3
     void setPosition(const QString& instrument, int position);
     int getPosition(const QString& instrument) const;
-    void quit() const;
+    void quit();
 };
 
 #endif // CTP_EXECUTER_H
