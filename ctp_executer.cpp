@@ -4,7 +4,6 @@
 
 #include <functional>
 #include <QSettings>
-#include <string>
 
 #include "ctp_executer.h"
 #include "ctp_executer_adaptor.h"
@@ -121,12 +120,34 @@ void CtpExecuter::customEvent(QEvent *event)
     {
         UserLoginRspEvent *uevent = static_cast<UserLoginRspEvent*>(event);
         if (uevent->errorID == 0) {
-            FrontID = uevent->RspUserLogin.FrontID;
-            SessionID = uevent->RspUserLogin.SessionID;
+            FrontID = uevent->rspUserLogin.FrontID;
+            SessionID = uevent->rspUserLogin.SessionID;
             qDebug() << DATE_TIME << "OnUserLogin OK! FrontID = " << FrontID << ", SessionID = " << SessionID;
             confirmSettlementInfo();
         } else {
             qDebug() << DATE_TIME << "OnUserLogin: ErrorID = " << uevent->errorID;
+        }
+    }
+        break;
+    case RSP_SETTLEMENT_INFO:
+    {
+        SettlementInfoEvent *sevent = static_cast<SettlementInfoEvent*>(event);
+        if (sevent->errorID == 0) {
+            auto list = sevent->settlementInfoList;
+            QString msg;
+            foreach (const auto & item, list) {
+                msg += item.Content;
+            }
+            qDebug() << msg;
+        }
+    }
+        break;
+    case RSP_TRADING_ACCOUNT:
+    {
+        TradingAccountEvent *tevent = static_cast<TradingAccountEvent*>(event);
+        if (tevent->errorID == 0) {
+            double available = tevent->tradingAccount.Available;
+            qDebug() << "available = " << available;
         }
     }
         break;

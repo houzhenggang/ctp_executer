@@ -13,13 +13,14 @@
 #define RSP_ERROR               (QEvent::User + 5)
 #define RSP_SETTLEMENT_INFO     (QEvent::User + 6)
 #define RSP_SETTLEMENT_CONFIRM  (QEvent::User + 7)
+#define RSP_TRADING_ACCOUNT     (QEvent::User + 8)
 
 struct RspInfo {
-    int errorID;  // CThostFtdcRspInfoField pRspInfo is too big, error ID is enough
+    int errorID;
     int nRequestID;
 
-    RspInfo(CThostFtdcRspInfoField *pRspInfo, int nRequestID)
-        : errorID(pRspInfo->ErrorID), nRequestID(nRequestID) {}
+    RspInfo(int err, int id)
+        : errorID(err), nRequestID(id) {}
 };
 
 class FrontConnectedEvent : public QEvent {
@@ -54,42 +55,61 @@ public:
 
 class UserLoginRspEvent : public QEvent, public RspInfo {
 public:
-    const CThostFtdcRspUserLoginField RspUserLogin;
+    const CThostFtdcRspUserLoginField rspUserLogin;
 
-    UserLoginRspEvent(CThostFtdcRspUserLoginField *pRspUserLogin, CThostFtdcRspInfoField *pRspInfo, int nRequestID) :
+    UserLoginRspEvent(CThostFtdcRspUserLoginField *pRspUserLogin, int err, int id) :
         QEvent(QEvent::Type(RSP_USER_LOGIN)),
-        RspInfo(pRspInfo, nRequestID),
-        RspUserLogin(*pRspUserLogin) {}
+        RspInfo(err, id),
+        rspUserLogin(*pRspUserLogin) {}
 };
 
 class SettlementInfoEvent : public QEvent, public RspInfo {
 public:
-    const CThostFtdcSettlementInfoField SettlementInfo;
+    const QList<CThostFtdcSettlementInfoField> settlementInfoList;
 
-    SettlementInfoEvent(CThostFtdcSettlementInfoField *pSettlementInfo, CThostFtdcRspInfoField *pRspInfo, int nRequestID) :
+    SettlementInfoEvent(QList<CThostFtdcSettlementInfoField> list, int err, int id) :
         QEvent(QEvent::Type(RSP_SETTLEMENT_INFO)),
-        RspInfo(pRspInfo, nRequestID),
-        SettlementInfo(*pSettlementInfo) {}
+        RspInfo(err, id),
+        settlementInfoList(list) {}
 };
 
 class SettlementInfoConfirmEvent : public QEvent, public RspInfo {
 public:
-    const CThostFtdcSettlementInfoConfirmField SettlementInfoConfirm;
+    const CThostFtdcSettlementInfoConfirmField settlementInfoConfirm;
 
-    SettlementInfoConfirmEvent(CThostFtdcSettlementInfoConfirmField *pSettlementInfoConfirm, CThostFtdcRspInfoField *pRspInfo, int nRequestID) :
+    SettlementInfoConfirmEvent(CThostFtdcSettlementInfoConfirmField *pSettlementInfoConfirm, int err, int id) :
         QEvent(QEvent::Type(RSP_SETTLEMENT_CONFIRM)),
-        RspInfo(pRspInfo, nRequestID),
-        SettlementInfoConfirm(*pSettlementInfoConfirm) {}
+        RspInfo(err, id),
+        settlementInfoConfirm(*pSettlementInfoConfirm) {}
+};
+
+class TradingAccountEvent : public QEvent, public RspInfo {
+public:
+    const CThostFtdcTradingAccountField tradingAccount;
+
+    TradingAccountEvent(CThostFtdcTradingAccountField *pTradingAccount, int err, int id) :
+        QEvent(QEvent::Type(RSP_TRADING_ACCOUNT)),
+        RspInfo(err, id),
+        tradingAccount(*pTradingAccount) {}
 };
 
 class CTradeHandler : public CThostFtdcTraderSpi {
     QObject * const receiver;
+
+    int lastRequestID;
+    QList<CThostFtdcSettlementInfoField> settlementInfoList;
 
 public:
     explicit CTradeHandler(QObject *obj);
     ~CTradeHandler();
 
     void postToReceiver(QEvent *event);
+
+    template<class EVT, class F>
+    void handleSingleRsp(F *pField, CThostFtdcRspInfoField *pRspInfo, const int nRequestID);
+
+    template<class EVT, class F>
+    void handleMultiRsp(QList<F> *pTList, F *pField, CThostFtdcRspInfoField *pRspInfo, const int nRequestID, const bool bIsLast);
 
     void OnFrontConnected();
 

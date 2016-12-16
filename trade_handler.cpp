@@ -6,6 +6,7 @@
 CTradeHandler::CTradeHandler(QObject *obj) :
     receiver(obj)
 {
+    lastRequestID = -1;
 }
 
 CTradeHandler::~CTradeHandler()
@@ -16,6 +17,47 @@ CTradeHandler::~CTradeHandler()
 inline void CTradeHandler::postToReceiver(QEvent *event)
 {
     QCoreApplication::postEvent(receiver, event);
+}
+
+template<class EVT, class F>
+void CTradeHandler::handleSingleRsp(F *pField, CThostFtdcRspInfoField *pRspInfo, const int nRequestID)
+{
+    int err = -1;
+    if (pRspInfo == NULL) {
+        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2\n");
+    } else {
+        err = pRspInfo->ErrorID;
+    }
+
+    if (pField != NULL) {
+        postToReceiver(new EVT(pField, err, nRequestID));
+    }
+}
+
+template<class EVT, class F>
+void CTradeHandler::handleMultiRsp(QList<F> *pTList, F *pField, CThostFtdcRspInfoField *pRspInfo, const int nRequestID, const bool bIsLast)
+{
+    if (nRequestID != lastRequestID) {  // 新Rsp
+        lastRequestID = nRequestID;
+        if (!pTList->isEmpty()) {       // 上一个requestID的消息没有接收全
+            postToReceiver(new EVT(*pTList, 0, nRequestID));
+            pTList->clear();
+        }
+        if (pRspInfo != NULL) {
+            if (pRspInfo->ErrorID != 0) {
+                postToReceiver(new EVT(*pTList, pRspInfo->ErrorID, nRequestID));
+                return;
+            }
+        }
+    }
+
+    if (pField != NULL) {
+        pTList->append(*pField);
+    }
+    if (bIsLast) {
+        postToReceiver(new EVT(*pTList, 0, nRequestID));
+        pTList->clear();
+    }
 }
 
 void CTradeHandler::OnFrontConnected()
@@ -35,76 +77,30 @@ void CTradeHandler::OnHeartBeatWarning(int nTimeLapse)
 
 void CTradeHandler::OnRspUserLogin(CThostFtdcRspUserLoginField *pRspUserLogin, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    postToReceiver(new UserLoginRspEvent(pRspUserLogin, pRspInfo, nRequestID));
+    postToReceiver(new UserLoginRspEvent(pRspUserLogin, pRspInfo->ErrorID, nRequestID));
 }
 
 void CTradeHandler::OnRspQrySettlementInfo(CThostFtdcSettlementInfoField *pSettlementInfo, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    printf("OnRspQrySettlementInfo\n");
-    if (pSettlementInfo == NULL) {
-        printf("pSettlementInfo = NULL\n");
-    }
-    if (pRspInfo == NULL) {
-        printf("pRspInfo = NULL\n");
-    }
-    if (pSettlementInfo != NULL && pRspInfo != NULL) {
-        postToReceiver(new SettlementInfoEvent(pSettlementInfo, pRspInfo, nRequestID));
-    }
-    if (pRspInfo != NULL)
-    printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID,
-        pRspInfo->ErrorMsg);
-    printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
-
-    if (pSettlementInfo != NULL) {
-        printf("TradingDay: %s, SettlementID = %d, SequenceNo = %d\n", pSettlementInfo->TradingDay, pSettlementInfo->SettlementID, pSettlementInfo->SequenceNo);
-        printf("%s\n", pSettlementInfo->Content);
-    }
+    puts(__FUNCTION__);
+    handleMultiRsp<SettlementInfoEvent>(&settlementInfoList, pSettlementInfo, pRspInfo, nRequestID, bIsLast);
 }
 
 void CTradeHandler::OnRspSettlementInfoConfirm(CThostFtdcSettlementInfoConfirmField *pSettlementInfoConfirm, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    printf("OnRspSettlementInfoConfirm\n");
-    if (pSettlementInfoConfirm == NULL) {
-        printf("pSettlementInfoConfirm = NULL\n");
-    }
-    if (pRspInfo == NULL) {
-        printf("pRspInfo = NULL\n");
-    }
-    if (pSettlementInfoConfirm != NULL && pRspInfo != NULL)
-    postToReceiver(new SettlementInfoConfirmEvent(pSettlementInfoConfirm, pRspInfo, nRequestID));
-    if (pRspInfo != NULL)
-    printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID,
-        pRspInfo->ErrorMsg);
-    printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
-
-    if (pSettlementInfoConfirm != NULL)
-        printf("%s\t%s\n", pSettlementInfoConfirm->ConfirmDate, pSettlementInfoConfirm->ConfirmTime);
+    puts(__FUNCTION__);
+    handleSingleRsp<SettlementInfoConfirmEvent>(pSettlementInfoConfirm, pRspInfo, nRequestID);
 }
 
 void CTradeHandler::OnRspQrySettlementInfoConfirm(CThostFtdcSettlementInfoConfirmField *pSettlementInfoConfirm, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    printf("OnRspQrySettlementInfoConfirm\n");
-
-    if (pSettlementInfoConfirm == NULL) {
-        printf("pSettlementInfoConfirm = NULL\n");
-    }
-    if (pRspInfo == NULL) {
-        printf("pRspInfo = NULL\n");
-    }
-    if (pSettlementInfoConfirm != NULL && pRspInfo != NULL)
-    postToReceiver(new SettlementInfoConfirmEvent(pSettlementInfoConfirm, pRspInfo, nRequestID));
-    if (pRspInfo != NULL)
-    printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID,
-        pRspInfo->ErrorMsg);
-    printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
-
-    if (pSettlementInfoConfirm != NULL)
-        printf("%s\t%s\n", pSettlementInfoConfirm->ConfirmDate, pSettlementInfoConfirm->ConfirmTime);
+    puts(__FUNCTION__);
+    handleSingleRsp<SettlementInfoConfirmEvent>(pSettlementInfoConfirm, pRspInfo, nRequestID);
 }
 
 void CTradeHandler::OnRspQryTradingAccount(CThostFtdcTradingAccountField *pTradingAccount, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    printf("OnRspQryTradingAccount\n");
+    puts(__FUNCTION__);
     if (pRspInfo != NULL)
     printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID,
         pRspInfo->ErrorMsg);
@@ -117,7 +113,7 @@ void CTradeHandler::OnRspQryTradingAccount(CThostFtdcTradingAccountField *pTradi
 
 void CTradeHandler::OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    printf("OnRspOrderInsert\n");
+    puts(__FUNCTION__);
     if (pRspInfo != NULL)
     printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID,
         pRspInfo->ErrorMsg);
@@ -126,7 +122,7 @@ void CTradeHandler::OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CTh
 
 void CTradeHandler::OnRtnOrder(CThostFtdcOrderField *pOrder)
 {
-    printf("OnRtnOrder\n");
+    puts(__FUNCTION__);
     if (pOrder != NULL)
         printf("StatusMsg: %s\n", pOrder->StatusMsg);
 }
