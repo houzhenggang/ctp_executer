@@ -23,9 +23,7 @@ template<class EVT, class F>
 void CTradeHandler::handleSingleRsp(F *pField, CThostFtdcRspInfoField *pRspInfo, const int nRequestID)
 {
     int err = -1;
-    if (pRspInfo == NULL) {
-        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2\n");
-    } else {
+    if (pRspInfo != NULL) {
         err = pRspInfo->ErrorID;
     }
 
@@ -101,14 +99,13 @@ void CTradeHandler::OnRspQrySettlementInfoConfirm(CThostFtdcSettlementInfoConfir
 void CTradeHandler::OnRspQryTradingAccount(CThostFtdcTradingAccountField *pTradingAccount, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
     puts(__FUNCTION__);
-    if (pRspInfo != NULL)
-    printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID,
-        pRspInfo->ErrorMsg);
-    printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
+    handleSingleRsp<TradingAccountEvent>(pTradingAccount, pRspInfo, nRequestID);
+}
 
-    if(pTradingAccount != NULL) {
-        printf("%llf\n", pTradingAccount->Available);
-    }
+void CTradeHandler::OnRspQryDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    puts(__FUNCTION__);
+    handleSingleRsp<DepthMarketDataEvent>(pDepthMarketData, pRspInfo, nRequestID);
 }
 
 void CTradeHandler::OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)

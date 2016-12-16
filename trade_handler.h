@@ -14,6 +14,7 @@
 #define RSP_SETTLEMENT_INFO     (QEvent::User + 6)
 #define RSP_SETTLEMENT_CONFIRM  (QEvent::User + 7)
 #define RSP_TRADING_ACCOUNT     (QEvent::User + 8)
+#define RSP_DEPTH_MARKET_DATA   (QEvent::User + 9)
 
 struct RspInfo {
     int errorID;
@@ -93,6 +94,16 @@ public:
         tradingAccount(*pTradingAccount) {}
 };
 
+class DepthMarketDataEvent : public QEvent, public RspInfo {
+public:
+    const CThostFtdcDepthMarketDataField depthMarketDataField;
+
+    DepthMarketDataEvent(CThostFtdcDepthMarketDataField *pDepthDataField, int err, int id) :
+        QEvent(QEvent::Type(RSP_DEPTH_MARKET_DATA)),
+        RspInfo(err, id),
+        depthMarketDataField(*pDepthDataField) {}
+};
+
 class CTradeHandler : public CThostFtdcTraderSpi {
     QObject * const receiver;
 
@@ -124,6 +135,7 @@ public:
     void OnRspQrySettlementInfoConfirm(CThostFtdcSettlementInfoConfirmField *pSettlementInfoConfirm, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
     void OnRspQryTradingAccount(CThostFtdcTradingAccountField *pTradingAccount, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+    void OnRspQryDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
     void OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
     void OnRtnOrder(CThostFtdcOrderField *pOrder);

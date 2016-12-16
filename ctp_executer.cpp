@@ -145,10 +145,15 @@ void CtpExecuter::customEvent(QEvent *event)
     case RSP_TRADING_ACCOUNT:
     {
         TradingAccountEvent *tevent = static_cast<TradingAccountEvent*>(event);
-        if (tevent->errorID == 0) {
-            double available = tevent->tradingAccount.Available;
-            qDebug() << "available = " << available;
-        }
+        double available = tevent->tradingAccount.Available;
+        qDebug() << "available = " << available;
+    }
+        break;
+    case RSP_DEPTH_MARKET_DATA:
+    {
+        DepthMarketDataEvent *devent = static_cast<DepthMarketDataEvent*>(event);
+        double lastPrice = devent->depthMarketDataField.LastPrice;
+        qDebug() << "laspPrice = " << lastPrice;
     }
         break;
     default:
@@ -228,7 +233,7 @@ int CtpExecuter::qrySettlementInfo()
  * \brief CtpExecuter::confirmSettlementInfo
  * 发送投资者结算结果确认请求
  *
- * \return
+ * \return nRequestID
  */
 int CtpExecuter::confirmSettlementInfo()
 {
@@ -249,7 +254,7 @@ int CtpExecuter::confirmSettlementInfo()
  * \brief CtpExecuter::qrySettlementInfoConfirm
  * 发送投资者结算结果确认查询请求
  *
- * \return
+ * \return nRequestID
  */
 int CtpExecuter::qrySettlementInfoConfirm()
 {
@@ -269,7 +274,7 @@ int CtpExecuter::qrySettlementInfoConfirm()
  * \brief CtpExecuter::qryTradingAccount
  * 发送查询资金账户请求
  *
- * \return
+ * \return nRequestID
  */
 int CtpExecuter::qryTradingAccount()
 {
@@ -281,6 +286,25 @@ int CtpExecuter::qryTradingAccount()
     int id = nRequestID.fetchAndAddRelaxed(1);
     auto callApi = std::bind(&CThostFtdcTraderApi::ReqQryTradingAccount, pUserApi, pAccountField, id);
     callTraderApi(callApi, pAccountField);
+
+    return id;
+}
+
+/*!
+ * \brief CtpExecuter::qryDepthMarketData
+ * 发送查询行情请求
+ *
+ * \param instrument 要查询的合约代码
+ * \return nRequestID
+ */
+int CtpExecuter::qryDepthMarketData(const QString &instrument)
+{
+    CThostFtdcQryDepthMarketDataField *pField = (CThostFtdcQryDepthMarketDataField*) malloc(sizeof(CThostFtdcQryDepthMarketDataField));
+    strcpy(pField->InstrumentID, instrument.toLatin1().data());
+
+    int id = nRequestID.fetchAndAddRelaxed(1);
+    auto callApi = std::bind(&CThostFtdcTraderApi::ReqQryDepthMarketData, pUserApi, pField, id);
+    callTraderApi(callApi, pField);
 
     return id;
 }
@@ -331,7 +355,7 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, double price, int v
 
 void CtpExecuter::setPosition(const QString& instrument, int position)
 {
-    // TODO update instrument's marketdata if necessary
+    qryDepthMarketData(instrument); // TODO 建立缓存机制, 不必每次查询
     target_pos_map.insert(instrument, position);
     // TODO postEvent to message loop
 }

@@ -48,6 +48,7 @@ protected:
     int confirmSettlementInfo();
     int qrySettlementInfoConfirm();
     int qryTradingAccount();
+    int qryDepthMarketData(const QString &instrument);
     int insertLimitOrder(const QString &instrument, double price, int volume, bool open);
 
 signals:
