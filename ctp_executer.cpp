@@ -164,6 +164,7 @@ void CtpExecuter::customEvent(QEvent *event)
 
 /*!
  * \brief CtpExecuter::callTraderApi
+ * 尝试调用traderApi, 如果失败就
  * 在一个新线程里反复调用traderApi, 直至成功(返回0)
  *
  * \param traderApi 无参函数对象
@@ -172,6 +173,15 @@ void CtpExecuter::customEvent(QEvent *event)
 template<typename Fn>
 void CtpExecuter::callTraderApi(Fn &traderApi, void * ptr)
 {
+    if (reqMutex.tryLock()) {
+        int ret = traderApi();
+        reqMutex.unlock();
+        if (ret == 0) {
+            free(ptr);
+            return;
+        }
+    }
+
     QtConcurrent::run([=]() -> void {
         int count_down = 100;
         while (count_down-- > 0) {
@@ -319,9 +329,9 @@ int CtpExecuter::qryDepthMarketData(const QString &instrument)
  * \param open 开仓(true)/平仓(false)标志
  * \return
  */
-int CtpExecuter::insertLimitOrder(const QString &instrument, double price, int volume, bool open)
+int CtpExecuter::insertLimitOrder(const QString &instrument, bool open, int volume, double price)
 {
-    Q_ASSERT(price > 0.0 && volume != 0);
+    Q_ASSERT(volume != 0 && price > 0.0);
 
     CThostFtdcInputOrderField inputOrder;
     memset(&inputOrder, 0, sizeof (CThostFtdcInputOrderField));
@@ -331,7 +341,7 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, double price, int v
 //	strcpy(inputOrder.OrderRef, orderRef);
 //	inputOrder.OrderRef[0]++;
 
-    inputOrder.Direction = THOST_FTDC_D_Sell;
+    inputOrder.Direction = volume > 0 ? THOST_FTDC_D_Buy : THOST_FTDC_D_Sell;
     inputOrder.CombOffsetFlag[0] = open ? THOST_FTDC_OF_Open : THOST_FTDC_OF_Close;
     inputOrder.CombHedgeFlag[0] = THOST_FTDC_HF_Speculation;
     inputOrder.VolumeTotalOriginal = qAbs(volume);
@@ -349,6 +359,27 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, double price, int v
     reqMutex.lock();
     int ret = pUserApi->ReqOrderInsert(&inputOrder, id);
     reqMutex.unlock();
+    Q_UNUSED(ret);
+    return id;
+}
+
+int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const QString &instrument)
+{
+    CThostFtdcInputOrderActionField orderAction;
+    memset(&orderAction, 0, sizeof(CThostFtdcInputOrderActionField));
+    strcpy(orderAction.BrokerID, c_brokerID);
+    strcpy(orderAction.InvestorID, c_userID);
+    memcpy(orderAction.OrderRef, orderRef, sizeof(TThostFtdcOrderRefType));
+    orderAction.FrontID = frontID;
+    orderAction.SessionID = sessionID;
+    orderAction.ActionFlag = THOST_FTDC_AF_Delete;
+    strcpy(orderAction.InstrumentID, instrument.toLatin1().data());
+
+    int id = nRequestID.fetchAndAddRelaxed(1);
+    reqMutex.lock();
+    int ret = pUserApi->ReqOrderAction(&orderAction, id);
+    reqMutex.unlock();
+    qDebug() << ret;
     Q_UNUSED(ret);
     return id;
 }
