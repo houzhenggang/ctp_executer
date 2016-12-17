@@ -74,12 +74,12 @@ void CTradeHandler::OnHeartBeatWarning(int nTimeLapse)
 
 void CTradeHandler::OnRspUserLogin(CThostFtdcRspUserLoginField *pRspUserLogin, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    postToReceiver(new UserLoginRspEvent(pRspUserLogin, pRspInfo->ErrorID, nRequestID));
+    Q_UNUSED(bIsLast);
+    handleSingleRsp<UserLoginRspEvent>(pRspUserLogin, pRspInfo, nRequestID);
 }
 
 void CTradeHandler::OnRspQrySettlementInfo(CThostFtdcSettlementInfoField *pSettlementInfo, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    puts(__FUNCTION__);
     handleMultiRsp<SettlementInfoEvent>(&settlementInfoList, pSettlementInfo, pRspInfo, nRequestID, bIsLast);
 }
 
@@ -97,13 +97,13 @@ void CTradeHandler::OnRspQrySettlementInfoConfirm(CThostFtdcSettlementInfoConfir
 
 void CTradeHandler::OnRspQryTradingAccount(CThostFtdcTradingAccountField *pTradingAccount, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    puts(__FUNCTION__);
+    Q_UNUSED(bIsLast);
     handleSingleRsp<TradingAccountEvent>(pTradingAccount, pRspInfo, nRequestID);
 }
 
 void CTradeHandler::OnRspQryDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    puts(__FUNCTION__);
+    Q_UNUSED(bIsLast);
     handleSingleRsp<DepthMarketDataEvent>(pDepthMarketData, pRspInfo, nRequestID);
 }
 
@@ -118,12 +118,20 @@ void CTradeHandler::OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CTh
 
 void CTradeHandler::OnRtnOrder(CThostFtdcOrderField *pOrder)
 {
-    puts(__FUNCTION__);
-    if (pOrder != NULL)
-        printf("StatusMsg: %s\n", pOrder->StatusMsg);
+    postToReceiver(new RtnOrderEvent(pOrder));
 }
 
 void CTradeHandler::OnErrRtnOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo)
 {
     printf("OnErrRtnOrderInsert: %s\n", pRspInfo->ErrorMsg);
+}
+
+void CTradeHandler::OnRspQryInvestorPosition(CThostFtdcInvestorPositionField *pInvestorPosition, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    handleMultiRsp<PositionEvent>(&positionList, pInvestorPosition, pRspInfo, nRequestID, bIsLast);
+}
+
+void CTradeHandler::OnRspQryInvestorPositionDetail(CThostFtdcInvestorPositionDetailField *pInvestorPositionDetail, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    handleMultiRsp<PositionDetailEvent>(&positionDetailList, pInvestorPositionDetail, pRspInfo, nRequestID, bIsLast);
 }

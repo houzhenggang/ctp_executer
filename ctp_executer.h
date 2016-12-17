@@ -51,6 +51,8 @@ protected:
     int qryDepthMarketData(const QString &instrument);
     int insertLimitOrder(const QString &instrument, bool open, int volume, double price);
     int cancelOrder(char* orderRef, int frontID, int sessionID, const QString &instrument);
+    int qryPosition(const QString &instrument = "");
+    int qryPositionDetail(const QString &instrument = "");
 
 signals:
 

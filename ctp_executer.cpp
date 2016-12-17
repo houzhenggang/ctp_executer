@@ -99,7 +99,7 @@ void CtpExecuter::customEvent(QEvent *event)
         break;
     case FRONT_DISCONNECTED:
     {
-        FrontDisconnectedEvent *fevent = static_cast<FrontDisconnectedEvent*>(event);
+        auto *fevent = static_cast<FrontDisconnectedEvent*>(event);
         // TODO
         switch (fevent->getReason()) {
         case 0x1001: // 网络读失败
@@ -118,7 +118,7 @@ void CtpExecuter::customEvent(QEvent *event)
     }
     case RSP_USER_LOGIN:
     {
-        UserLoginRspEvent *uevent = static_cast<UserLoginRspEvent*>(event);
+        auto *uevent = static_cast<UserLoginRspEvent*>(event);
         if (uevent->errorID == 0) {
             FrontID = uevent->rspUserLogin.FrontID;
             SessionID = uevent->rspUserLogin.SessionID;
@@ -131,12 +131,12 @@ void CtpExecuter::customEvent(QEvent *event)
         break;
     case RSP_SETTLEMENT_INFO:
     {
-        SettlementInfoEvent *sevent = static_cast<SettlementInfoEvent*>(event);
+        auto *sevent = static_cast<SettlementInfoEvent*>(event);
         if (sevent->errorID == 0) {
-            auto list = sevent->settlementInfoList;
+            auto &list = sevent->settlementInfoList;
             QString msg;
             foreach (const auto & item, list) {
-                msg += item.Content;
+                msg += QTextCodec::codecForName("GBK")->toUnicode(item.Content);
             }
             qDebug() << msg;
         }
@@ -144,16 +144,40 @@ void CtpExecuter::customEvent(QEvent *event)
         break;
     case RSP_TRADING_ACCOUNT:
     {
-        TradingAccountEvent *tevent = static_cast<TradingAccountEvent*>(event);
+        auto *tevent = static_cast<TradingAccountEvent*>(event);
         double available = tevent->tradingAccount.Available;
         qDebug() << "available = " << available;
     }
         break;
     case RSP_DEPTH_MARKET_DATA:
     {
-        DepthMarketDataEvent *devent = static_cast<DepthMarketDataEvent*>(event);
+        auto *devent = static_cast<DepthMarketDataEvent*>(event);
         double lastPrice = devent->depthMarketDataField.LastPrice;
         qDebug() << "lastPrice = " << lastPrice;
+    }
+        break;
+    case RTN_ORDER:
+    {
+        auto *revent = static_cast<RtnOrderEvent*>(event);
+        qDebug() << revent->orderField.InsertTime << QTextCodec::codecForName("GBK")->toUnicode(revent->orderField.StatusMsg);
+    }
+        break;
+    case RSP_POSITION:
+    {
+        auto *pevent = static_cast<PositionEvent*>(event);
+        auto &list = pevent->positionList;
+        foreach (const auto &item, list) {
+            qDebug() << item.InstrumentID << item.Position;
+        }
+    }
+        break;
+    case RSP_POSITION_DETAIL:
+    {
+        auto *pevent = static_cast<PositionDetailEvent*>(event);
+        auto &list = pevent->positionDetailList;
+        foreach (const auto &item, list) {
+            qDebug() << item.InstrumentID << item.Volume;
+        }
     }
         break;
     default:
@@ -164,8 +188,8 @@ void CtpExecuter::customEvent(QEvent *event)
 
 /*!
  * \brief CtpExecuter::callTraderApi
- * 尝试调用traderApi, 如果失败就
- * 在一个新线程里反复调用traderApi, 直至成功(返回0)
+ * 尝试调用traderApi, 如果失败(返回值不是0),
+ * 就在一个新线程里反复调用traderApi, 直至成功
  *
  * \param traderApi 无参函数对象
  * \param ptr 成功调用traderApi或超时之后释放
@@ -390,6 +414,34 @@ int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const Q
     int ret = pUserApi->ReqOrderAction(&orderAction, id);
     reqMutex.unlock();
     Q_UNUSED(ret);
+    return id;
+}
+
+int CtpExecuter::qryPosition(const QString &instrument)
+{
+    auto *pField = (CThostFtdcQryInvestorPositionField*) malloc(sizeof(CThostFtdcQryInvestorPositionField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
+    strcpy(pField->InstrumentID, instrument.toLatin1().data());
+
+    int id = nRequestID.fetchAndAddRelaxed(1);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryInvestorPosition, pUserApi, pField, id);
+    callTraderApi(traderApi, pField);
+
+    return id;
+}
+
+int CtpExecuter::qryPositionDetail(const QString &instrument)
+{
+    auto *pField = (CThostFtdcQryInvestorPositionDetailField*) malloc(sizeof(CThostFtdcQryInvestorPositionDetailField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
+    strcpy(pField->InstrumentID, instrument.toLatin1().data());
+
+    int id = nRequestID.fetchAndAddRelaxed(1);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryInvestorPositionDetail, pUserApi, pField, id);
+    callTraderApi(traderApi, pField);
+
     return id;
 }
 

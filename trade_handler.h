@@ -15,6 +15,9 @@
 #define RSP_SETTLEMENT_CONFIRM  (QEvent::User + 7)
 #define RSP_TRADING_ACCOUNT     (QEvent::User + 8)
 #define RSP_DEPTH_MARKET_DATA   (QEvent::User + 9)
+#define RTN_ORDER               (QEvent::User + 10)
+#define RSP_POSITION            (QEvent::User + 11)
+#define RSP_POSITION_DETAIL     (QEvent::User + 12)
 
 struct RspInfo {
     int errorID;
@@ -104,11 +107,42 @@ public:
         depthMarketDataField(*pDepthDataField) {}
 };
 
+class RtnOrderEvent : public QEvent {
+public:
+    const CThostFtdcOrderField orderField;
+
+    explicit RtnOrderEvent(CThostFtdcOrderField *pOrderField) :
+        QEvent(QEvent::Type(RTN_ORDER)),
+        orderField(*pOrderField) {}
+};
+
+class PositionEvent : public QEvent, public RspInfo {
+public:
+    const QList<CThostFtdcInvestorPositionField> positionList;
+
+    PositionEvent(QList<CThostFtdcInvestorPositionField> list, int err, int id) :
+        QEvent(QEvent::Type(RSP_POSITION)),
+        RspInfo(err, id),
+        positionList(list) {}
+};
+
+class PositionDetailEvent : public QEvent, public RspInfo {
+public:
+    const QList<CThostFtdcInvestorPositionDetailField> positionDetailList;
+
+    PositionDetailEvent(QList<CThostFtdcInvestorPositionDetailField> list, int err, int id) :
+        QEvent(QEvent::Type(RSP_POSITION_DETAIL)),
+        RspInfo(err, id),
+        positionDetailList(list) {}
+};
+
 class CTradeHandler : public CThostFtdcTraderSpi {
     QObject * const receiver;
 
     int lastRequestID;
     QList<CThostFtdcSettlementInfoField> settlementInfoList;
+    QList<CThostFtdcInvestorPositionField> positionList;
+    QList<CThostFtdcInvestorPositionDetailField> positionDetailList;
 
 public:
     explicit CTradeHandler(QObject *obj);
@@ -140,6 +174,9 @@ public:
     void OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
     void OnRtnOrder(CThostFtdcOrderField *pOrder);
     void OnErrRtnOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo);
+
+    void OnRspQryInvestorPosition(CThostFtdcInvestorPositionField *pInvestorPosition, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+    void OnRspQryInvestorPositionDetail(CThostFtdcInvestorPositionDetailField *pInvestorPositionDetail, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 };
 
 #endif // TRADE_HANDLER_H
