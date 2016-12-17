@@ -176,8 +176,9 @@ void CtpExecuter::customEvent(QEvent *event)
         auto *pevent = static_cast<PositionDetailEvent*>(event);
         auto &list = pevent->positionDetailList;
         foreach (const auto &item, list) {
-            qDebug() << item.InstrumentID << item.Volume;
+            real_pos_map[item.InstrumentID] = item.Volume;
         }
+        pos_update_time = QDateTime::currentDateTime();
     }
         break;
     default:
@@ -197,9 +198,9 @@ void CtpExecuter::customEvent(QEvent *event)
 template<typename Fn>
 void CtpExecuter::callTraderApi(Fn &traderApi, void * ptr)
 {
-    if (reqMutex.tryLock()) {
+    if (traderApiMutex.tryLock()) {
         int ret = traderApi();
-        reqMutex.unlock();
+        traderApiMutex.unlock();
         if (ret == 0) {
             free(ptr);
             return;
@@ -210,9 +211,9 @@ void CtpExecuter::callTraderApi(Fn &traderApi, void * ptr)
         int count_down = 100;
         while (count_down-- > 0) {
             _sleep(400 - count_down * 2);   // TODO 改进退避算法
-            reqMutex.lock();
+            traderApiMutex.lock();
             int ret = traderApi();
-            reqMutex.unlock();
+            traderApiMutex.unlock();
             if (ret == 0) {
                 break;
             }
@@ -236,9 +237,9 @@ int CtpExecuter::login()
     strcpy(reqUserLogin.Password, c_password);
 
     int id = nRequestID.fetchAndAddRelaxed(1);
-    reqMutex.lock();
+    traderApiMutex.lock();
     int ret = pUserApi->ReqUserLogin(&reqUserLogin, id);
-    reqMutex.unlock();
+    traderApiMutex.unlock();
     Q_UNUSED(ret);
     return id;
 }
@@ -277,9 +278,9 @@ int CtpExecuter::confirmSettlementInfo()
     strcpy(confirmField.InvestorID, c_userID);
 
     int id = nRequestID.fetchAndAddRelaxed(1);
-    reqMutex.lock();
+    traderApiMutex.lock();
     int ret = pUserApi->ReqSettlementInfoConfirm(&confirmField, id);
-    reqMutex.unlock();
+    traderApiMutex.unlock();
     Q_UNUSED(ret);
     return id;
 }
@@ -362,8 +363,8 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, bool open, int volu
     strcpy(inputOrder.BrokerID, c_brokerID);
     strcpy(inputOrder.InvestorID, c_userID);
     strcpy(inputOrder.InstrumentID, instrument.toLatin1().data());
-//	strcpy(inputOrder.OrderRef, orderRef);
-//	inputOrder.OrderRef[0]++;
+//	sprintf(inputOrder.OrderRef, "%12d", orderRef);
+//	orderRef++;
 
     inputOrder.Direction = volume > 0 ? THOST_FTDC_D_Buy : THOST_FTDC_D_Sell;
     inputOrder.CombOffsetFlag[0] = open ? THOST_FTDC_OF_Open : THOST_FTDC_OF_Close;
@@ -380,9 +381,9 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, bool open, int volu
     inputOrder.TimeCondition = THOST_FTDC_TC_GFD;
 
     int id = nRequestID.fetchAndAddRelaxed(1);
-    reqMutex.lock();
+    traderApiMutex.lock();
     int ret = pUserApi->ReqOrderInsert(&inputOrder, id);
-    reqMutex.unlock();
+    traderApiMutex.unlock();
     Q_UNUSED(ret);
     return id;
 }
@@ -410,13 +411,20 @@ int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const Q
     strcpy(orderAction.InstrumentID, instrument.toLatin1().data());
 
     int id = nRequestID.fetchAndAddRelaxed(1);
-    reqMutex.lock();
+    traderApiMutex.lock();
     int ret = pUserApi->ReqOrderAction(&orderAction, id);
-    reqMutex.unlock();
+    traderApiMutex.unlock();
     Q_UNUSED(ret);
     return id;
 }
 
+/*!
+ * \brief CtpExecuter::qryPosition
+ * 查询持仓
+ *
+ * \param instrument 合约代码
+ * \return nRequestID
+ */
 int CtpExecuter::qryPosition(const QString &instrument)
 {
     auto *pField = (CThostFtdcQryInvestorPositionField*) malloc(sizeof(CThostFtdcQryInvestorPositionField));
@@ -431,6 +439,13 @@ int CtpExecuter::qryPosition(const QString &instrument)
     return id;
 }
 
+/*!
+ * \brief CtpExecuter::qryPositionDetail
+ * 查询持仓明细
+ *
+ * \param instrument 合约代码
+ * \return nRequestID
+ */
 int CtpExecuter::qryPositionDetail(const QString &instrument)
 {
     auto *pField = (CThostFtdcQryInvestorPositionDetailField*) malloc(sizeof(CThostFtdcQryInvestorPositionDetailField));
@@ -454,15 +469,24 @@ void CtpExecuter::setPosition(const QString& instrument, int position)
 
 /*!
  * \brief CtpExecuter::getPosition
+ * 获取实盘仓位
+ *
  * \param instrument 合约代码
- * \return 实盘仓位
+ * \return 若更新时间有效, 返回实盘仓位, 否则返回-INT_MAX
  */
 int CtpExecuter::getPosition(const QString& instrument) const
 {
-    // TODO check update time
-    return real_pos_map.value(instrument);
+    if (pos_update_time.isValid()) {
+        return real_pos_map.value(instrument);
+    } else {
+        return -INT_MAX;
+    }
 }
 
+/*!
+ * \brief CtpExecuter::quit
+ * 退出
+ */
 void CtpExecuter::quit()
 {
     QCoreApplication::quit();

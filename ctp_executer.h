@@ -6,6 +6,7 @@
 #include <QByteArray>
 #include <QMap>
 #include <QMutex>
+#include <QDateTime>
 
 class CThostFtdcTraderApi;
 class CTradeHandler;
@@ -20,6 +21,7 @@ public:
 
 protected:
     QAtomicInt nRequestID;
+    QMutex traderApiMutex;
     CThostFtdcTraderApi *pUserApi;
     CTradeHandler *pHandler;
 
@@ -35,10 +37,9 @@ protected:
 
     QMap<QString, int> target_pos_map;
     QMap<QString, int> real_pos_map;
+    QDateTime pos_update_time;
 
-    QMutex reqMutex;
-
-    void customEvent(QEvent *event);
+    void customEvent(QEvent *event) override;
 
     template<typename Fn>
     void callTraderApi(Fn &traderApi, void * ptr);
