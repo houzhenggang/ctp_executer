@@ -1,7 +1,6 @@
 #include <QCoreApplication>
 
 #include "trade_handler.h"
-#include "ctp_executer.h"
 
 CTradeHandler::CTradeHandler(QObject *obj) :
     receiver(obj)

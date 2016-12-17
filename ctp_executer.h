@@ -41,7 +41,7 @@ protected:
     void customEvent(QEvent *event);
 
     template<typename Fn>
-    void callTraderApi(Fn &callApi, void * ptr);
+    void callTraderApi(Fn &traderApi, void * ptr);
 
     int login();
     int qrySettlementInfo();

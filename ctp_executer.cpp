@@ -153,7 +153,7 @@ void CtpExecuter::customEvent(QEvent *event)
     {
         DepthMarketDataEvent *devent = static_cast<DepthMarketDataEvent*>(event);
         double lastPrice = devent->depthMarketDataField.LastPrice;
-        qDebug() << "laspPrice = " << lastPrice;
+        qDebug() << "lastPrice = " << lastPrice;
     }
         break;
     default:
@@ -227,14 +227,14 @@ int CtpExecuter::login()
  */
 int CtpExecuter::qrySettlementInfo()
 {
-    CThostFtdcQrySettlementInfoField *pInfoField = (CThostFtdcQrySettlementInfoField*) malloc(sizeof (CThostFtdcQrySettlementInfoField));
+    auto *pInfoField = (CThostFtdcQrySettlementInfoField*) malloc(sizeof (CThostFtdcQrySettlementInfoField));
     memset(pInfoField, 0, sizeof (CThostFtdcQrySettlementInfoField));
     strcpy(pInfoField->BrokerID, c_brokerID);
     strcpy(pInfoField->InvestorID, c_userID);
 
     int id = nRequestID.fetchAndAddRelaxed(1);
-    auto callApi = std::bind(&CThostFtdcTraderApi::ReqQrySettlementInfo, pUserApi, pInfoField, id);
-    callTraderApi(callApi, pInfoField);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQrySettlementInfo, pUserApi, pInfoField, id);
+    callTraderApi(traderApi, pInfoField);
 
     return id;
 }
@@ -268,14 +268,14 @@ int CtpExecuter::confirmSettlementInfo()
  */
 int CtpExecuter::qrySettlementInfoConfirm()
 {
-    CThostFtdcQrySettlementInfoConfirmField *pConfirmField = (CThostFtdcQrySettlementInfoConfirmField*) malloc(sizeof (CThostFtdcQrySettlementInfoConfirmField));
+    auto *pConfirmField = (CThostFtdcQrySettlementInfoConfirmField*) malloc(sizeof (CThostFtdcQrySettlementInfoConfirmField));
     memset(pConfirmField, 0, sizeof (CThostFtdcQrySettlementInfoConfirmField));
     strcpy(pConfirmField->BrokerID, c_brokerID);
     strcpy(pConfirmField->InvestorID, c_userID);
 
     int id = nRequestID.fetchAndAddRelaxed(1);
-    auto callApi = std::bind(&CThostFtdcTraderApi::ReqQrySettlementInfoConfirm, pUserApi, pConfirmField, id);
-    callTraderApi(callApi, pConfirmField);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQrySettlementInfoConfirm, pUserApi, pConfirmField, id);
+    callTraderApi(traderApi, pConfirmField);
 
     return id;
 }
@@ -288,14 +288,14 @@ int CtpExecuter::qrySettlementInfoConfirm()
  */
 int CtpExecuter::qryTradingAccount()
 {
-    CThostFtdcQryTradingAccountField *pAccountField = (CThostFtdcQryTradingAccountField*) malloc(sizeof (CThostFtdcQryTradingAccountField));
+    auto *pAccountField = (CThostFtdcQryTradingAccountField*) malloc(sizeof (CThostFtdcQryTradingAccountField));
     memset(pAccountField, 0, sizeof (CThostFtdcQryTradingAccountField));
     strcpy(pAccountField->BrokerID, c_brokerID);
     strcpy(pAccountField->InvestorID, c_userID);
 
     int id = nRequestID.fetchAndAddRelaxed(1);
-    auto callApi = std::bind(&CThostFtdcTraderApi::ReqQryTradingAccount, pUserApi, pAccountField, id);
-    callTraderApi(callApi, pAccountField);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryTradingAccount, pUserApi, pAccountField, id);
+    callTraderApi(traderApi, pAccountField);
 
     return id;
 }
@@ -309,12 +309,12 @@ int CtpExecuter::qryTradingAccount()
  */
 int CtpExecuter::qryDepthMarketData(const QString &instrument)
 {
-    CThostFtdcQryDepthMarketDataField *pField = (CThostFtdcQryDepthMarketDataField*) malloc(sizeof(CThostFtdcQryDepthMarketDataField));
+    auto *pField = (CThostFtdcQryDepthMarketDataField*) malloc(sizeof(CThostFtdcQryDepthMarketDataField));
     strcpy(pField->InstrumentID, instrument.toLatin1().data());
 
     int id = nRequestID.fetchAndAddRelaxed(1);
-    auto callApi = std::bind(&CThostFtdcTraderApi::ReqQryDepthMarketData, pUserApi, pField, id);
-    callTraderApi(callApi, pField);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryDepthMarketData, pUserApi, pField, id);
+    callTraderApi(traderApi, pField);
 
     return id;
 }
@@ -327,7 +327,7 @@ int CtpExecuter::qryDepthMarketData(const QString &instrument)
  * \param price 价格(限价, 不得超出涨跌停范围)
  * \param volume 手数(非零整数, 正数代表做多, 负数代表做空)
  * \param open 开仓(true)/平仓(false)标志
- * \return
+ * \return nRequestID
  */
 int CtpExecuter::insertLimitOrder(const QString &instrument, bool open, int volume, double price)
 {
@@ -363,6 +363,16 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, bool open, int volu
     return id;
 }
 
+/*!
+ * \brief CtpExecuter::cancelOrder
+ * 撤单
+ *
+ * \param orderRef 报单饮用(TThostFtdcOrderRefType)
+ * \param frontID 前置编号
+ * \param sessionID 会话编号
+ * \param instrument 合约代码
+ * \return nRequestID
+ */
 int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const QString &instrument)
 {
     CThostFtdcInputOrderActionField orderAction;
@@ -379,7 +389,6 @@ int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const Q
     reqMutex.lock();
     int ret = pUserApi->ReqOrderAction(&orderAction, id);
     reqMutex.unlock();
-    qDebug() << ret;
     Q_UNUSED(ret);
     return id;
 }
