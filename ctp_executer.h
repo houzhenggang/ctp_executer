@@ -49,14 +49,14 @@ protected:
     int confirmSettlementInfo();
     int qrySettlementInfoConfirm();
     int qryTradingAccount();
-    int qryDepthMarketData(const QString &instrument);
+    int qryDepthMarketData(const QString &instrument = "");
     int insertLimitOrder(const QString &instrument, bool open, int volume, double price);
     int cancelOrder(char* orderRef, int frontID, int sessionID, const QString &instrument);
     int qryPosition(const QString &instrument = "");
     int qryPositionDetail(const QString &instrument = "");
 
 signals:
-
+    void dealMade(const QString& instrument, int volume);
 public slots:
      // int getTimeDiff(int id);  //shijiancha id = 0, 1, 2, 3
     void setPosition(const QString& instrument, int position);

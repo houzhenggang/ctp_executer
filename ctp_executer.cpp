@@ -56,15 +56,7 @@ CtpExecuter::CtpExecuter(QObject *parent) :
     pHandler = new CTradeHandler(this);
     pUserApi->RegisterSpi(pHandler);
 
-    // 订阅私有流
-    // TERT_RESTART:从本交易日开始重传
-    // TERT_RESUME:从上次收到的续传
-    // TERT_QUICK:只传送登录后私有流的内容
     pUserApi->SubscribePrivateTopic(THOST_TERT_QUICK);
-    // 订阅公共流
-    // TERT_RESTART:从本交易日开始重传
-    // TERT_RESUME:从上次收到的续传
-    // TERT_QUICK:只传送登录后公共流的内容
     pUserApi->SubscribePublicTopic(THOST_TERT_QUICK);
 
     settings.beginGroup("FrontSites");
@@ -152,8 +144,9 @@ void CtpExecuter::customEvent(QEvent *event)
     case RSP_DEPTH_MARKET_DATA:
     {
         auto *devent = static_cast<DepthMarketDataEvent*>(event);
+        QString instrument = devent->depthMarketDataField.InstrumentID;
         double lastPrice = devent->depthMarketDataField.LastPrice;
-        qDebug() << "lastPrice = " << lastPrice;
+        qDebug() << instrument << ", lastPrice = " << lastPrice;
     }
         break;
     case RTN_ORDER:
@@ -363,6 +356,7 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, bool open, int volu
     strcpy(inputOrder.BrokerID, c_brokerID);
     strcpy(inputOrder.InvestorID, c_userID);
     strcpy(inputOrder.InstrumentID, instrument.toLatin1().data());
+    strcpy(inputOrder.OrderRef, "");
 //	sprintf(inputOrder.OrderRef, "%12d", orderRef);
 //	orderRef++;
 
