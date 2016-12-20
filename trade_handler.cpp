@@ -85,13 +85,13 @@ void CTradeHandler::OnRspQrySettlementInfo(CThostFtdcSettlementInfoField *pSettl
 
 void CTradeHandler::OnRspSettlementInfoConfirm(CThostFtdcSettlementInfoConfirmField *pSettlementInfoConfirm, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    puts(__FUNCTION__);
+    Q_UNUSED(bIsLast);
     handleSingleRsp<SettlementInfoConfirmEvent>(pSettlementInfoConfirm, pRspInfo, nRequestID);
 }
 
 void CTradeHandler::OnRspQrySettlementInfoConfirm(CThostFtdcSettlementInfoConfirmField *pSettlementInfoConfirm, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    puts(__FUNCTION__);
+    Q_UNUSED(bIsLast);
     handleSingleRsp<SettlementInfoConfirmEvent>(pSettlementInfoConfirm, pRspInfo, nRequestID);
 }
 
@@ -109,11 +109,24 @@ void CTradeHandler::OnRspQryDepthMarketData(CThostFtdcDepthMarketDataField *pDep
 
 void CTradeHandler::OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    puts(__FUNCTION__);
-    if (pRspInfo != NULL)
-    printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID,
-        pRspInfo->ErrorMsg);
-    printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
+    Q_UNUSED(bIsLast);
+    handleSingleRsp<RspOrderInsertEvent>(pInputOrder, pRspInfo, nRequestID);
+}
+
+void CTradeHandler::OnRspOrderAction(CThostFtdcInputOrderActionField *pInputOrderAction, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    Q_UNUSED(bIsLast);
+    handleSingleRsp<RspOrderActionEvent>(pInputOrderAction, pRspInfo, nRequestID);
+}
+
+void CTradeHandler::OnErrRtnOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo)
+{
+    handleSingleRsp<ErrRtnOrderInsertEvent>(pInputOrder, pRspInfo);
+}
+
+void CTradeHandler::OnErrRtnOrderAction(CThostFtdcOrderActionField *pOrderAction, CThostFtdcRspInfoField *pRspInfo)
+{
+    handleSingleRsp<ErrRtnOrderActionEvent>(pOrderAction, pRspInfo);
 }
 
 void CTradeHandler::OnRtnOrder(CThostFtdcOrderField *pOrder)
@@ -121,14 +134,19 @@ void CTradeHandler::OnRtnOrder(CThostFtdcOrderField *pOrder)
     postToReceiver(new RtnOrderEvent(pOrder));
 }
 
-void CTradeHandler::OnErrRtnOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo)
+void CTradeHandler::OnRtnTrade(CThostFtdcTradeField *pTrade)
 {
-    printf("OnErrRtnOrderInsert: %s\n", pRspInfo->ErrorMsg);
+    postToReceiver(new RtnTradeEvent(pTrade));
 }
 
 void CTradeHandler::OnRspQryOrder(CThostFtdcOrderField *pOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
     handleMultiRsp<QryOrderEvent>(&orderList, pOrder, pRspInfo, nRequestID, bIsLast);
+}
+
+void CTradeHandler::OnRspQryTrade(CThostFtdcTradeField *pTrade, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    handleMultiRsp<QryTradeEvent>(&tradeList, pTrade, pRspInfo, nRequestID, bIsLast);
 }
 
 void CTradeHandler::OnRspQryInvestorPosition(CThostFtdcInvestorPositionField *pInvestorPosition, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)

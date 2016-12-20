@@ -150,28 +150,63 @@ void CtpExecuter::customEvent(QEvent *event)
         qDebug() << instrument << ", lastPrice = " << lastPrice;
     }
         break;
+    case RSP_ORDER_INSERT:
+    {
+        auto *ievent = static_cast<RspOrderInsertEvent*>(event);
+    }
+        break;
+    case RSP_ORDER_ACTION:
+    {
+        auto *aevent = static_cast<RspOrderActionEvent*>(event);
+    }
+        break;
+    case ERR_RTN_ORDER_INSERT:
+    {
+        auto *eievent = static_cast<ErrRtnOrderInsertEvent*>(event);
+    }
+        break;
+    case ERR_RTN_ORDER_ACTION:
+    {
+        auto *eaevent = static_cast<ErrRtnOrderActionEvent*>(event);
+    }
+        break;
     case RTN_ORDER:
     {
         auto *revent = static_cast<RtnOrderEvent*>(event);
-        qDebug() << revent->orderField.InsertTime << QTextCodec::codecForName("GBK")->toUnicode(revent->orderField.StatusMsg);
+        qDebug() << revent->orderField.InsertTime << revent->orderField.OrderStatus <<
+                    QTextCodec::codecForName("GBK")->toUnicode(revent->orderField.StatusMsg);
+    }
+        break;
+    case RTN_TRADE:
+    {
+        auto *tevent = static_cast<RtnTradeEvent*>(event);
+        int volume = tevent->tradeField.Volume;
+        if (tevent->tradeField.Direction == THOST_FTDC_D_Sell) {
+            volume *= -1;
+        }
+        emit dealMade(tevent->tradeField.InstrumentID, volume);
     }
         break;
     case RSP_QRY_ORDER:
     {
-        auto *qevent = static_cast<QryOrderEvent*>(event);
+        auto *qoevent = static_cast<QryOrderEvent*>(event);
         order_map.clear();
-        foreach (const auto &item, qevent->orderList) {
+        foreach (const auto &item, qoevent->orderList) {
             order_map.insert(item.InstrumentID, item);
             qDebug() << item.OrderStatus << QTextCodec::codecForName("GBK")->toUnicode(item.StatusMsg);
         }
         order_update_time = QDateTime::currentDateTime();
     }
         break;
+    case RSP_QRY_TRADE:
+    {
+        auto *qtevent = static_cast<QryTradeEvent*>(event);
+    }
+        break;
     case RSP_QRY_POSITION:
     {
         auto *pevent = static_cast<PositionEvent*>(event);
-        auto &list = pevent->positionList;
-        foreach (const auto &item, list) {
+        foreach (const auto &item, pevent->positionList) {
             qDebug() << item.InstrumentID << item.Position;
         }
     }
@@ -179,8 +214,8 @@ void CtpExecuter::customEvent(QEvent *event)
     case RSP_QRY_POSITION_DETAIL:
     {
         auto *pevent = static_cast<PositionDetailEvent*>(event);
-        auto &list = pevent->positionDetailList;
-        foreach (const auto &item, list) {
+        real_pos_map.clear();
+        foreach (const auto &item, pevent->positionDetailList) {
             real_pos_map[item.InstrumentID] = item.Volume;
         }
         pos_update_time = QDateTime::currentDateTime();
@@ -428,8 +463,8 @@ int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const Q
  * \brief CtpExecuter::qryOrder
  * 查询报单
  *
- * \param instrument
- * \return
+ * \param instrument 合约代码
+ * \return nRequestID
  */
 int CtpExecuter::qryOrder(const QString &instrument)
 {
@@ -441,6 +476,28 @@ int CtpExecuter::qryOrder(const QString &instrument)
 
     int id = nRequestID.fetchAndAddRelaxed(1);
     auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryOrder, pUserApi, pField, id);
+    callTraderApi(traderApi, pField);
+
+    return id;
+}
+
+/*!
+ * \brief CtpExecuter::qryOrder
+ * 查询成交
+ *
+ * \param instrument 合约代码
+ * \return nRequestID
+ */
+int CtpExecuter::qryTrade(const QString &instrument)
+{
+    auto *pField = (CThostFtdcQryTradeField *) malloc(sizeof(CThostFtdcQryTradeField));
+    memset(pField, 0, sizeof(CThostFtdcQryTradeField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
+    strcpy(pField->InstrumentID, instrument.toLatin1().data());
+
+    int id = nRequestID.fetchAndAddRelaxed(1);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryTrade, pUserApi, pField, id);
     callTraderApi(traderApi, pField);
 
     return id;
@@ -488,8 +545,55 @@ int CtpExecuter::qryPositionDetail(const QString &instrument)
     return id;
 }
 
-int CtpExecuter::getPendingOrderPositions(const QString &instrument) const
+/*!
+ * \brief CtpExecuter::setPosition
+ * 为该合约设置一个新的仓位, 如果与原仓位不同, 则执行操作
+ *
+ * \param instrument 合约代码
+ * \param position 新仓位
+ */
+void CtpExecuter::setPosition(const QString& instrument, int position)
 {
+    qryDepthMarketData(instrument); // TODO 建立缓存机制, 不必每次查询
+    target_pos_map.insert(instrument, position);
+
+    int real_pos = getPosition(instrument);
+    if (real_pos != -INT_MAX) {
+        int pending_order_pos = getPendingOrderPosition(instrument);
+        if (real_pos + pending_order_pos != position) {
+            // 执行操作
+        }
+    }
+}
+
+/*!
+ * \brief CtpExecuter::getPosition
+ * 获取实盘仓位
+ *
+ * \param instrument 被查询的合约代码
+ * \return 该合约实盘仓位, 如果查询结果已经过期返回-INT_MAX
+ */
+int CtpExecuter::getPosition(const QString& instrument) const
+{
+    if (pos_update_time.isValid()) {
+        return real_pos_map.value(instrument);
+    } else {
+        return -INT_MAX;
+    }
+}
+
+/*!
+ * \brief CtpExecuter::getPendingOrderPosition
+ * 获取该合约未成交订单的仓位
+ *
+ * \param instrument 被查询的合约代码
+ * \return 该合约未成交订单的仓位之和, 如果查询结果已经过期返回-INT_MAX
+ */
+int CtpExecuter::getPendingOrderPosition(const QString &instrument) const
+{
+    if (!order_update_time.isValid()) {
+        return -INT_MAX;
+    }
     int sum = 0;
     const auto orderList = order_map.values(instrument);
     foreach (const auto& order, orderList) {
@@ -505,29 +609,6 @@ int CtpExecuter::getPendingOrderPositions(const QString &instrument) const
         }
     }
     return sum;
-}
-
-void CtpExecuter::setPosition(const QString& instrument, int position)
-{
-    qryDepthMarketData(instrument); // TODO 建立缓存机制, 不必每次查询
-    target_pos_map.insert(instrument, position);
-    // TODO postEvent to message loop
-}
-
-/*!
- * \brief CtpExecuter::getPosition
- * 获取实盘仓位
- *
- * \param instrument 合约代码
- * \return 若更新时间有效, 返回实盘仓位, 否则返回-INT_MAX
- */
-int CtpExecuter::getPosition(const QString& instrument) const
-{
-    if (pos_update_time.isValid()) {
-        return real_pos_map.value(instrument);
-    } else {
-        return -INT_MAX;
-    }
 }
 
 /*!

@@ -15,10 +15,16 @@
 #define RSP_SETTLEMENT_CONFIRM  (QEvent::User + 7)
 #define RSP_TRADING_ACCOUNT     (QEvent::User + 8)
 #define RSP_DEPTH_MARKET_DATA   (QEvent::User + 9)
-#define RTN_ORDER               (QEvent::User + 10)
-#define RSP_QRY_ORDER           (QEvent::User + 11)
-#define RSP_QRY_POSITION        (QEvent::User + 12)
-#define RSP_QRY_POSITION_DETAIL (QEvent::User + 13)
+#define RSP_ORDER_INSERT        (QEvent::User + 10)
+#define RSP_ORDER_ACTION        (QEvent::User + 11)
+#define ERR_RTN_ORDER_INSERT    (QEvent::User + 12)
+#define ERR_RTN_ORDER_ACTION    (QEvent::User + 13)
+#define RTN_ORDER               (QEvent::User + 14)
+#define RTN_TRADE               (QEvent::User + 15)
+#define RSP_QRY_ORDER           (QEvent::User + 16)
+#define RSP_QRY_TRADE           (QEvent::User + 17)
+#define RSP_QRY_POSITION        (QEvent::User + 18)
+#define RSP_QRY_POSITION_DETAIL (QEvent::User + 19)
 
 struct RspInfo {
     int errorID;
@@ -108,6 +114,46 @@ public:
         depthMarketDataField(*pDepthDataField) {}
 };
 
+class RspOrderInsertEvent : public QEvent, public RspInfo {
+public:
+    const CThostFtdcInputOrderField inputOrderField;
+
+    RspOrderInsertEvent(CThostFtdcInputOrderField *pInputOrder, int err, int id) :
+        QEvent(QEvent::Type(RSP_ORDER_INSERT)),
+        RspInfo(err, id),
+        inputOrderField(*pInputOrder) {}
+};
+
+class RspOrderActionEvent : public QEvent, public RspInfo {
+public:
+    const CThostFtdcInputOrderActionField inputOrderActionField;
+
+    RspOrderActionEvent(CThostFtdcInputOrderActionField *pInputOrderAction, int err, int id) :
+        QEvent(QEvent::Type(RSP_ORDER_ACTION)),
+        RspInfo(err, id),
+        inputOrderActionField(*pInputOrderAction) {}
+};
+
+class ErrRtnOrderInsertEvent: public QEvent, public RspInfo {
+public:
+    const CThostFtdcInputOrderField inputOrderField;
+
+    ErrRtnOrderInsertEvent(CThostFtdcInputOrderField *pInputOrder, int err, int id) :
+        QEvent(QEvent::Type(ERR_RTN_ORDER_INSERT)),
+        RspInfo(err, id),
+        inputOrderField(*pInputOrder) {}
+};
+
+class ErrRtnOrderActionEvent: public QEvent, public RspInfo {
+public:
+    const CThostFtdcOrderActionField inputOrderField;
+
+    ErrRtnOrderActionEvent(CThostFtdcOrderActionField *pOrderAction, int err, int id) :
+        QEvent(QEvent::Type(ERR_RTN_ORDER_ACTION)),
+        RspInfo(err, id),
+        inputOrderField(*pOrderAction) {}
+};
+
 class RtnOrderEvent : public QEvent {
 public:
     const CThostFtdcOrderField orderField;
@@ -115,6 +161,15 @@ public:
     explicit RtnOrderEvent(CThostFtdcOrderField *pOrderField) :
         QEvent(QEvent::Type(RTN_ORDER)),
         orderField(*pOrderField) {}
+};
+
+class RtnTradeEvent : public QEvent {
+public:
+    const CThostFtdcTradeField tradeField;
+
+    explicit RtnTradeEvent(CThostFtdcTradeField *pTradeField) :
+        QEvent(QEvent::Type(RTN_TRADE)),
+        tradeField(*pTradeField) {}
 };
 
 class QryOrderEvent : public QEvent, public RspInfo {
@@ -125,6 +180,16 @@ public:
         QEvent(QEvent::Type(RSP_QRY_ORDER)),
         RspInfo(err, id),
         orderList(list) {}
+};
+
+class QryTradeEvent : public QEvent, public RspInfo {
+public:
+    const QList<CThostFtdcTradeField> tradeList;
+
+    QryTradeEvent(QList<CThostFtdcTradeField> list, int err, int id) :
+        QEvent(QEvent::Type(RSP_QRY_TRADE)),
+        RspInfo(err, id),
+        tradeList(list) {}
 };
 
 class PositionEvent : public QEvent, public RspInfo {
@@ -153,6 +218,7 @@ class CTradeHandler : public CThostFtdcTraderSpi {
     int lastRequestID;
     QList<CThostFtdcSettlementInfoField> settlementInfoList;
     QList<CThostFtdcOrderField> orderList;
+    QList<CThostFtdcTradeField> tradeList;
     QList<CThostFtdcInvestorPositionField> positionList;
     QList<CThostFtdcInvestorPositionDetailField> positionDetailList;
 
@@ -163,7 +229,7 @@ public:
     void postToReceiver(QEvent *event);
 
     template<class EVT, class F>
-    void handleSingleRsp(F *pField, CThostFtdcRspInfoField *pRspInfo, const int nRequestID);
+    void handleSingleRsp(F *pField, CThostFtdcRspInfoField *pRspInfo, const int nRequestID = -1);
 
     template<class EVT, class F>
     void handleMultiRsp(QList<F> *pTList, F *pField, CThostFtdcRspInfoField *pRspInfo, const int nRequestID, const bool bIsLast);
@@ -184,10 +250,14 @@ public:
     void OnRspQryDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
     void OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
-    void OnRtnOrder(CThostFtdcOrderField *pOrder);
+    void OnRspOrderAction(CThostFtdcInputOrderActionField *pInputOrderAction, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
     void OnErrRtnOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo);
+    void OnErrRtnOrderAction(CThostFtdcOrderActionField *pOrderAction, CThostFtdcRspInfoField *pRspInfo);
+    void OnRtnOrder(CThostFtdcOrderField *pOrder);
+    void OnRtnTrade(CThostFtdcTradeField *pTrade);
 
     void OnRspQryOrder(CThostFtdcOrderField *pOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+    void OnRspQryTrade(CThostFtdcTradeField *pTrade, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
     void OnRspQryInvestorPosition(CThostFtdcInvestorPositionField *pInvestorPosition, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
     void OnRspQryInvestorPositionDetail(CThostFtdcInvestorPositionDetailField *pInvestorPositionDetail, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);

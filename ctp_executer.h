@@ -52,21 +52,20 @@ protected:
     int confirmSettlementInfo();
     int qrySettlementInfoConfirm();
     int qryTradingAccount();
-    int qryDepthMarketData(const QString &instrument = "");
+    int qryDepthMarketData(const QString &instrument = QString());
     int insertLimitOrder(const QString &instrument, bool open, int volume, double price);
     int cancelOrder(char* orderRef, int frontID, int sessionID, const QString &instrument);
-    int qryOrder(const QString &instrument = "");
-    int qryPosition(const QString &instrument = "");
-    int qryPositionDetail(const QString &instrument = "");
-
-    int getPendingOrderPositions(const QString &instrument) const;
+    int qryOrder(const QString &instrument = QString());
+    int qryTrade(const QString &instrument = QString());
+    int qryPosition(const QString &instrument = QString());
+    int qryPositionDetail(const QString &instrument = QString());
 
 signals:
     void dealMade(const QString& instrument, int volume);
 public slots:
-     // int getTimeDiff(int id);  //shijiancha id = 0, 1, 2, 3
     void setPosition(const QString& instrument, int position);
     int getPosition(const QString& instrument) const;
+    int getPendingOrderPosition(const QString &instrument) const;
     void quit();
 };
 
