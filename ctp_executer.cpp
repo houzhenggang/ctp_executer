@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <QSettings>
+#include <QtConcurrentRun>
 
 #include "ctp_executer.h"
 #include "ctp_executer_adaptor.h"
@@ -109,6 +110,12 @@ void CtpExecuter::customEvent(QEvent *event)
             break;
         }
     }
+    case HEARTBEAT_WARNING:
+    {
+        auto *hevent = static_cast<HeartBeatWarningEvent*>(event);
+        emit heartBeatWarning(hevent->getLapseTime());
+    }
+        break;
     case RSP_USER_LOGIN:
     {
         auto *uevent = static_cast<UserLoginRspEvent*>(event);

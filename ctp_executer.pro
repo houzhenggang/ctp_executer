@@ -1,6 +1,8 @@
 QT += core dbus
 QT -= gui
 
+greaterThan(QT_MAJOR_VERSION, 4): QT += concurrent
+
 TARGET = ctp_executer
 CONFIG += console
 CONFIG -= app_bundle

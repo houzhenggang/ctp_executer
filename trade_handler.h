@@ -27,8 +27,8 @@
 #define RSP_QRY_POSITION_DETAIL (QEvent::User + 19)
 
 struct RspInfo {
-    int errorID;
-    int nRequestID;
+    const int errorID;
+    const int nRequestID;
 
     RspInfo(int err, int id)
         : errorID(err), nRequestID(id) {}
@@ -45,7 +45,7 @@ protected:
     const int reason;
 
 public:
-    FrontDisconnectedEvent(int Reason) :
+    explicit FrontDisconnectedEvent(int Reason) :
         QEvent(QEvent::Type(FRONT_DISCONNECTED)),
         reason(Reason) {}
 
@@ -57,11 +57,11 @@ protected:
     const int nTimeLapse;
 
 public:
-    HeartBeatWarningEvent(int nTimeLapse) :
+    explicit HeartBeatWarningEvent(int nTimeLapse) :
         QEvent(QEvent::Type(HEARTBEAT_WARNING)),
         nTimeLapse(nTimeLapse) {}
 
-    int getnTimeLapse() const { return nTimeLapse; }
+    int getLapseTime() const { return nTimeLapse; }
 };
 
 class UserLoginRspEvent : public QEvent, public RspInfo {

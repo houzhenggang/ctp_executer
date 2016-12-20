@@ -61,6 +61,7 @@ protected:
     int qryPositionDetail(const QString &instrument = QString());
 
 signals:
+    void heartBeatWarning(int nTimeLapse);
     void dealMade(const QString& instrument, int volume);
 public slots:
     void setPosition(const QString& instrument, int position);
