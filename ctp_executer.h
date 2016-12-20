@@ -10,6 +10,7 @@
 
 class CThostFtdcTraderApi;
 class CTradeHandler;
+class Order;
 
 class CtpExecuter : public QObject
 {
@@ -38,6 +39,8 @@ protected:
     QMap<QString, int> target_pos_map;
     QMap<QString, int> real_pos_map;
     QDateTime pos_update_time;
+    QMultiMap<QString, Order> order_map;
+    QDateTime order_update_time;
 
     void customEvent(QEvent *event) override;
 
@@ -55,6 +58,8 @@ protected:
     int qryOrder(const QString &instrument = "");
     int qryPosition(const QString &instrument = "");
     int qryPositionDetail(const QString &instrument = "");
+
+    int getPendingOrderPositions(const QString &instrument) const;
 
 signals:
     void dealMade(const QString& instrument, int volume);

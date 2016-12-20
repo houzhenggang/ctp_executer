@@ -8,6 +8,7 @@
 #include "ctp_executer.h"
 #include "ctp_executer_adaptor.h"
 #include "trade_handler.h"
+#include "order.h"
 
 #ifdef Q_OS_WIN
 #include <Windows.h>
@@ -155,15 +156,18 @@ void CtpExecuter::customEvent(QEvent *event)
         qDebug() << revent->orderField.InsertTime << QTextCodec::codecForName("GBK")->toUnicode(revent->orderField.StatusMsg);
     }
         break;
-    case QRY_ORDER:
+    case RSP_QRY_ORDER:
     {
         auto *qevent = static_cast<QryOrderEvent*>(event);
+        order_map.clear();
         foreach (const auto &item, qevent->orderList) {
+            order_map.insert(item.InstrumentID, item);
             qDebug() << item.OrderStatus << QTextCodec::codecForName("GBK")->toUnicode(item.StatusMsg);
         }
+        order_update_time = QDateTime::currentDateTime();
     }
         break;
-    case RSP_POSITION:
+    case RSP_QRY_POSITION:
     {
         auto *pevent = static_cast<PositionEvent*>(event);
         auto &list = pevent->positionList;
@@ -172,7 +176,7 @@ void CtpExecuter::customEvent(QEvent *event)
         }
     }
         break;
-    case RSP_POSITION_DETAIL:
+    case RSP_QRY_POSITION_DETAIL:
     {
         auto *pevent = static_cast<PositionDetailEvent*>(event);
         auto &list = pevent->positionDetailList;
@@ -482,6 +486,25 @@ int CtpExecuter::qryPositionDetail(const QString &instrument)
     callTraderApi(traderApi, pField);
 
     return id;
+}
+
+int CtpExecuter::getPendingOrderPositions(const QString &instrument) const
+{
+    int sum = 0;
+    const auto orderList = order_map.values(instrument);
+    foreach (const auto& order, orderList) {
+        if (order.status == THOST_FTDC_OST_PartTradedQueueing ||
+                order.status == THOST_FTDC_OST_NoTradeQueueing ||
+                order.status == THOST_FTDC_OST_Unknown)
+        {
+            int position = order.vol_remain;
+            if (order.direction == THOST_FTDC_D_Sell) {
+                position *= -1;
+            }
+            sum += position;
+        }
+    }
+    return sum;
 }
 
 void CtpExecuter::setPosition(const QString& instrument, int position)

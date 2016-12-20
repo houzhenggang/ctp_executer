@@ -9,14 +9,16 @@ TEMPLATE = app
 
 SOURCES += main.cpp \
     ctp_executer.cpp \
-    trade_handler.cpp
+    trade_handler.cpp \
+    order.cpp
 
 HEADERS += \
     ctp_executer.h \
     ThostFtdcTraderApi.h \
     ThostFtdcUserApiDataType.h \
     ThostFtdcUserApiStruct.h \
-    trade_handler.h
+    trade_handler.h \
+    order.h
 
 DBUS_ADAPTORS += ctp_executer.xml
 

@@ -16,9 +16,9 @@
 #define RSP_TRADING_ACCOUNT     (QEvent::User + 8)
 #define RSP_DEPTH_MARKET_DATA   (QEvent::User + 9)
 #define RTN_ORDER               (QEvent::User + 10)
-#define QRY_ORDER               (QEvent::User + 11)
-#define RSP_POSITION            (QEvent::User + 12)
-#define RSP_POSITION_DETAIL     (QEvent::User + 13)
+#define RSP_QRY_ORDER           (QEvent::User + 11)
+#define RSP_QRY_POSITION        (QEvent::User + 12)
+#define RSP_QRY_POSITION_DETAIL (QEvent::User + 13)
 
 struct RspInfo {
     int errorID;
@@ -122,7 +122,7 @@ public:
     const QList<CThostFtdcOrderField> orderList;
 
     QryOrderEvent(QList<CThostFtdcOrderField> list, int err, int id) :
-        QEvent(QEvent::Type(QRY_ORDER)),
+        QEvent(QEvent::Type(RSP_QRY_ORDER)),
         RspInfo(err, id),
         orderList(list) {}
 };
@@ -132,7 +132,7 @@ public:
     const QList<CThostFtdcInvestorPositionField> positionList;
 
     PositionEvent(QList<CThostFtdcInvestorPositionField> list, int err, int id) :
-        QEvent(QEvent::Type(RSP_POSITION)),
+        QEvent(QEvent::Type(RSP_QRY_POSITION)),
         RspInfo(err, id),
         positionList(list) {}
 };
@@ -142,7 +142,7 @@ public:
     const QList<CThostFtdcInvestorPositionDetailField> positionDetailList;
 
     PositionDetailEvent(QList<CThostFtdcInvestorPositionDetailField> list, int err, int id) :
-        QEvent(QEvent::Type(RSP_POSITION_DETAIL)),
+        QEvent(QEvent::Type(RSP_QRY_POSITION_DETAIL)),
         RspInfo(err, id),
         positionDetailList(list) {}
 };
