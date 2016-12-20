@@ -39,12 +39,12 @@ CtpExecuter::CtpExecuter(QObject *parent) :
     SessionID = 0;
 
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, "ctp", "ctp_executer");
-    QByteArray flowPath = settings.value("FlowPath").toString().toLatin1();
+    QByteArray flowPath = settings.value("FlowPath").toByteArray();
 
     settings.beginGroup("AccountInfo");
-    brokerID = settings.value("BrokerID").toString().toLatin1();
-    userID = settings.value("UserID").toString().toLatin1();
-    password = settings.value("Password").toString().toLatin1();
+    brokerID = settings.value("BrokerID").toByteArray();
+    userID = settings.value("UserID").toByteArray();
+    password = settings.value("Password").toByteArray();
     settings.endGroup();
 
     // Pre-convert QString to char*
@@ -153,6 +153,14 @@ void CtpExecuter::customEvent(QEvent *event)
     {
         auto *revent = static_cast<RtnOrderEvent*>(event);
         qDebug() << revent->orderField.InsertTime << QTextCodec::codecForName("GBK")->toUnicode(revent->orderField.StatusMsg);
+    }
+        break;
+    case QRY_ORDER:
+    {
+        auto *qevent = static_cast<QryOrderEvent*>(event);
+        foreach (const auto &item, qevent->orderList) {
+            qDebug() << item.OrderStatus << QTextCodec::codecForName("GBK")->toUnicode(item.StatusMsg);
+        }
     }
         break;
     case RSP_POSITION:
@@ -409,6 +417,28 @@ int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const Q
     int ret = pUserApi->ReqOrderAction(&orderAction, id);
     traderApiMutex.unlock();
     Q_UNUSED(ret);
+    return id;
+}
+
+/*!
+ * \brief CtpExecuter::qryOrder
+ * 查询报单
+ *
+ * \param instrument
+ * \return
+ */
+int CtpExecuter::qryOrder(const QString &instrument)
+{
+    auto *pField = (CThostFtdcQryOrderField *) malloc(sizeof(CThostFtdcQryOrderField));
+    memset(pField, 0, sizeof(CThostFtdcQryOrderField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
+    strcpy(pField->InstrumentID, instrument.toLatin1().data());
+
+    int id = nRequestID.fetchAndAddRelaxed(1);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryOrder, pUserApi, pField, id);
+    callTraderApi(traderApi, pField);
+
     return id;
 }
 

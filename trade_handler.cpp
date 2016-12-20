@@ -126,6 +126,11 @@ void CTradeHandler::OnErrRtnOrderInsert(CThostFtdcInputOrderField *pInputOrder, 
     printf("OnErrRtnOrderInsert: %s\n", pRspInfo->ErrorMsg);
 }
 
+void CTradeHandler::OnRspQryOrder(CThostFtdcOrderField *pOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    handleMultiRsp<QryOrderEvent>(&orderList, pOrder, pRspInfo, nRequestID, bIsLast);
+}
+
 void CTradeHandler::OnRspQryInvestorPosition(CThostFtdcInvestorPositionField *pInvestorPosition, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
     handleMultiRsp<PositionEvent>(&positionList, pInvestorPosition, pRspInfo, nRequestID, bIsLast);

@@ -16,8 +16,9 @@
 #define RSP_TRADING_ACCOUNT     (QEvent::User + 8)
 #define RSP_DEPTH_MARKET_DATA   (QEvent::User + 9)
 #define RTN_ORDER               (QEvent::User + 10)
-#define RSP_POSITION            (QEvent::User + 11)
-#define RSP_POSITION_DETAIL     (QEvent::User + 12)
+#define QRY_ORDER               (QEvent::User + 11)
+#define RSP_POSITION            (QEvent::User + 12)
+#define RSP_POSITION_DETAIL     (QEvent::User + 13)
 
 struct RspInfo {
     int errorID;
@@ -116,6 +117,16 @@ public:
         orderField(*pOrderField) {}
 };
 
+class QryOrderEvent : public QEvent, public RspInfo {
+public:
+    const QList<CThostFtdcOrderField> orderList;
+
+    QryOrderEvent(QList<CThostFtdcOrderField> list, int err, int id) :
+        QEvent(QEvent::Type(QRY_ORDER)),
+        RspInfo(err, id),
+        orderList(list) {}
+};
+
 class PositionEvent : public QEvent, public RspInfo {
 public:
     const QList<CThostFtdcInvestorPositionField> positionList;
@@ -141,6 +152,7 @@ class CTradeHandler : public CThostFtdcTraderSpi {
 
     int lastRequestID;
     QList<CThostFtdcSettlementInfoField> settlementInfoList;
+    QList<CThostFtdcOrderField> orderList;
     QList<CThostFtdcInvestorPositionField> positionList;
     QList<CThostFtdcInvestorPositionDetailField> positionDetailList;
 
@@ -174,6 +186,8 @@ public:
     void OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
     void OnRtnOrder(CThostFtdcOrderField *pOrder);
     void OnErrRtnOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo);
+
+    void OnRspQryOrder(CThostFtdcOrderField *pOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
     void OnRspQryInvestorPosition(CThostFtdcInvestorPositionField *pInvestorPosition, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
     void OnRspQryInvestorPositionDetail(CThostFtdcInvestorPositionDetailField *pInvestorPositionDetail, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
