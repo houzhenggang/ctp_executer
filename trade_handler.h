@@ -14,17 +14,19 @@
 #define RSP_SETTLEMENT_INFO     (QEvent::User + 6)
 #define RSP_SETTLEMENT_CONFIRM  (QEvent::User + 7)
 #define RSP_TRADING_ACCOUNT     (QEvent::User + 8)
-#define RSP_DEPTH_MARKET_DATA   (QEvent::User + 9)
-#define RSP_ORDER_INSERT        (QEvent::User + 10)
-#define RSP_ORDER_ACTION        (QEvent::User + 11)
-#define ERR_RTN_ORDER_INSERT    (QEvent::User + 12)
-#define ERR_RTN_ORDER_ACTION    (QEvent::User + 13)
-#define RTN_ORDER               (QEvent::User + 14)
-#define RTN_TRADE               (QEvent::User + 15)
-#define RSP_QRY_ORDER           (QEvent::User + 16)
-#define RSP_QRY_TRADE           (QEvent::User + 17)
-#define RSP_QRY_POSITION        (QEvent::User + 18)
-#define RSP_QRY_POSITION_DETAIL (QEvent::User + 19)
+#define RSP_QRY_INSTRUMENT_CR   (QEvent::User + 9)  // commistion_rate
+#define RSP_QRY_INSTRUMENT      (QEvent::User + 10)
+#define RSP_DEPTH_MARKET_DATA   (QEvent::User + 11)
+#define RSP_ORDER_INSERT        (QEvent::User + 12)
+#define RSP_ORDER_ACTION        (QEvent::User + 13)
+#define ERR_RTN_ORDER_INSERT    (QEvent::User + 14)
+#define ERR_RTN_ORDER_ACTION    (QEvent::User + 15)
+#define RTN_ORDER               (QEvent::User + 16)
+#define RTN_TRADE               (QEvent::User + 17)
+#define RSP_QRY_ORDER           (QEvent::User + 18)
+#define RSP_QRY_TRADE           (QEvent::User + 19)
+#define RSP_QRY_POSITION        (QEvent::User + 20)
+#define RSP_QRY_POSITION_DETAIL (QEvent::User + 21)
 
 struct RspInfo {
     const int errorID;
@@ -102,6 +104,26 @@ public:
         QEvent(QEvent::Type(RSP_TRADING_ACCOUNT)),
         RspInfo(err, id),
         tradingAccount(*pTradingAccount) {}
+};
+
+class RspQryInstrumentCommissionRateEvent : public QEvent, public RspInfo {
+public:
+    const QList<CThostFtdcInstrumentCommissionRateField> instrumentCommissionRateList;
+
+    RspQryInstrumentCommissionRateEvent(QList<CThostFtdcInstrumentCommissionRateField> list, int err, int id) :
+        QEvent(QEvent::Type(RSP_QRY_INSTRUMENT_CR)),
+        RspInfo(err, id),
+        instrumentCommissionRateList(list) {}
+};
+
+class RspQryInstrumentEvent : public QEvent, public RspInfo {
+public:
+    const QList<CThostFtdcInstrumentField> instrumentList;
+
+    RspQryInstrumentEvent(QList<CThostFtdcInstrumentField> list, int err, int id) :
+        QEvent(QEvent::Type(RSP_QRY_INSTRUMENT)),
+        RspInfo(err, id),
+        instrumentList(list) {}
 };
 
 class DepthMarketDataEvent : public QEvent, public RspInfo {
@@ -217,6 +239,8 @@ class CTradeHandler : public CThostFtdcTraderSpi {
 
     int lastRequestID;
     QList<CThostFtdcSettlementInfoField> settlementInfoList;
+    QList<CThostFtdcInstrumentCommissionRateField> instrumentCommissionRateList;
+    QList<CThostFtdcInstrumentField> instrumentList;
     QList<CThostFtdcOrderField> orderList;
     QList<CThostFtdcTradeField> tradeList;
     QList<CThostFtdcInvestorPositionField> positionList;
@@ -247,6 +271,8 @@ public:
     void OnRspQrySettlementInfoConfirm(CThostFtdcSettlementInfoConfirmField *pSettlementInfoConfirm, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
     void OnRspQryTradingAccount(CThostFtdcTradingAccountField *pTradingAccount, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+    void OnRspQryInstrumentCommissionRate(CThostFtdcInstrumentCommissionRateField *pInstrumentCommissionRate, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+    void OnRspQryInstrument(CThostFtdcInstrumentField *pInstrument, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
     void OnRspQryDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
     void OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);

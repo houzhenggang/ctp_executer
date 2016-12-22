@@ -94,7 +94,7 @@ void CtpExecuter::customEvent(QEvent *event)
     case FRONT_DISCONNECTED:
     {
         auto *fevent = static_cast<FrontDisconnectedEvent*>(event);
-        // TODO
+        // TODO reset position maps, make update times invalid
         switch (fevent->getReason()) {
         case 0x1001: // 网络读失败
             break;
@@ -110,6 +110,7 @@ void CtpExecuter::customEvent(QEvent *event)
             break;
         }
     }
+        break;
     case HEARTBEAT_WARNING:
     {
         auto *hevent = static_cast<HeartBeatWarningEvent*>(event);
@@ -124,6 +125,8 @@ void CtpExecuter::customEvent(QEvent *event)
             SessionID = uevent->rspUserLogin.SessionID;
             qDebug() << DATE_TIME << "OnUserLogin OK! FrontID = " << FrontID << ", SessionID = " << SessionID;
             confirmSettlementInfo();
+            QTimer::singleShot(1000, this, SLOT(qryOrder()));
+            QTimer::singleShot(2000, this, SLOT(qryPositionDetail()));
         } else {
             qDebug() << DATE_TIME << "OnUserLogin: ErrorID = " << uevent->errorID;
         }
@@ -149,12 +152,24 @@ void CtpExecuter::customEvent(QEvent *event)
         qDebug() << "available = " << available;
     }
         break;
+    case RSP_QRY_INSTRUMENT_CR:
+    {
+        auto *qcevent = static_cast<RspQryInstrumentCommissionRateEvent*>(event);
+    }
+        break;
+    case RSP_QRY_INSTRUMENT:
+    {
+        auto *qievent = static_cast<RspQryInstrumentEvent*>(event);
+    }
+        break;
     case RSP_DEPTH_MARKET_DATA:
     {
         auto *devent = static_cast<DepthMarketDataEvent*>(event);
         QString instrument = devent->depthMarketDataField.InstrumentID;
-        double lastPrice = devent->depthMarketDataField.LastPrice;
-        qDebug() << instrument << ", lastPrice = " << lastPrice;
+        double upperLimitPrice = devent->depthMarketDataField.UpperLimitPrice;
+        double lowerLimitPrice = devent->depthMarketDataField.LowerLimitPrice;
+        instrument_upper_lower_map.insert(instrument, qMakePair(upperLimitPrice, lowerLimitPrice));
+        instrument_expire_time_map.insert(instrument, getExpireTime());
     }
         break;
     case RSP_ORDER_INSERT:
@@ -191,6 +206,25 @@ void CtpExecuter::customEvent(QEvent *event)
         if (tevent->tradeField.Direction == THOST_FTDC_D_Sell) {
             volume *= -1;
         }
+
+        switch(tevent->tradeField.OffsetFlag) {
+        case THOST_FTDC_OF_Open:            //开仓
+            td_pos_map[tevent->tradeField.InstrumentID] += volume;
+            break;
+        case THOST_FTDC_OF_Close:           //平仓
+            td_pos_map[tevent->tradeField.InstrumentID] += volume;  // TODO 区分
+            break;
+        case THOST_FTDC_OF_CloseToday:      //平今
+            td_pos_map[tevent->tradeField.InstrumentID] += volume;
+            break;
+        case THOST_FTDC_OF_CloseYesterday:  //平昨
+            yd_pos_map[tevent->tradeField.InstrumentID] += volume;
+            break;
+        default:
+            td_pos_map[tevent->tradeField.InstrumentID] += volume;
+            break;
+        }
+
         emit dealMade(tevent->tradeField.InstrumentID, volume);
     }
         break;
@@ -202,7 +236,7 @@ void CtpExecuter::customEvent(QEvent *event)
             order_map.insert(item.InstrumentID, item);
             qDebug() << item.OrderStatus << QTextCodec::codecForName("GBK")->toUnicode(item.StatusMsg);
         }
-        order_update_time = QDateTime::currentDateTime();
+        order_expire_time = getExpireTime();
     }
         break;
     case RSP_QRY_TRADE:
@@ -213,17 +247,47 @@ void CtpExecuter::customEvent(QEvent *event)
     case RSP_QRY_POSITION:
     {
         auto *pevent = static_cast<PositionEvent*>(event);
+        yd_pos_map.clear();
+        td_pos_map.clear();
+
         foreach (const auto &item, pevent->positionList) {
-            qDebug() << item.InstrumentID << item.Position;
+            int YdPosition = item.YdPosition;   // 昨仓数据不会更新
+            int TdPosition = item.TodayPosition;
+            if (item.PosiDirection == THOST_FTDC_PD_Short) {
+                YdPosition *= -1;
+                TdPosition *= -1;
+            }
+            yd_pos_map[item.InstrumentID] += YdPosition;
+            td_pos_map[item.InstrumentID] += TdPosition;
         }
+        pos_update_time = QDateTime::currentDateTime();
     }
         break;
     case RSP_QRY_POSITION_DETAIL:
     {
         auto *pevent = static_cast<PositionDetailEvent*>(event);
-        real_pos_map.clear();
+
+        QSet<QString> updateSet;
         foreach (const auto &item, pevent->positionDetailList) {
-            real_pos_map[item.InstrumentID] = item.Volume;
+            updateSet.insert(item.InstrumentID);
+        }
+
+        foreach (const auto &item, updateSet) {
+            yd_pos_map.remove(item);
+            td_pos_map.remove(item);
+        }
+
+        foreach (const auto &item, pevent->positionDetailList) {
+            qDebug() << item.InstrumentID << "position:" << item.Volume << item.OpenDate << item.TradingDay << item.ExchangeID;
+            int volume = item.Volume;
+            if (item.Direction == THOST_FTDC_D_Sell) {
+                volume *= -1;
+            }
+            if (strcmp(item.OpenDate, item.TradingDay) == 0) {
+                td_pos_map[item.InstrumentID] += volume;
+            } else {
+                yd_pos_map[item.InstrumentID] += volume;
+            }
         }
         pos_update_time = QDateTime::currentDateTime();
     }
@@ -368,6 +432,48 @@ int CtpExecuter::qryTradingAccount()
     int id = nRequestID.fetchAndAddRelaxed(1);
     auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryTradingAccount, pUserApi, pAccountField, id);
     callTraderApi(traderApi, pAccountField);
+
+    return id;
+}
+
+/*!
+ * \brief CtpExecuter::qryInstrumentCommissionRate
+ * 查询手续费率
+ *
+ * \param instrument 合约代码(为空代表所有持仓合约)
+ * \return nRequestID
+ */
+int CtpExecuter::qryInstrumentCommissionRate(const QString &instrument)
+{
+    auto * pField = (CThostFtdcQryInstrumentCommissionRateField*) malloc (sizeof(CThostFtdcQryInstrumentCommissionRateField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
+    strcpy(pField->InstrumentID, instrument.toLatin1().data());
+
+    int id = nRequestID.fetchAndAddRelaxed(1);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryInstrumentCommissionRate, pUserApi, pField, id);
+    callTraderApi(traderApi, pField);
+
+    return id;
+}
+
+/*!
+ * \brief CtpExecuter::qryInstrument
+ * 查询合约
+ *
+ * \param instrument 合约代码(为空代表所有合约)
+ * \param exchangeID 交易所代码(为空代表所有交易所)
+ * \return nRequestID
+ */
+int CtpExecuter::qryInstrument(const QString &instrument, const QString &exchangeID)
+{
+    auto * pField = (CThostFtdcQryInstrumentField*) malloc(sizeof(CThostFtdcQryInstrumentField));
+    strcpy(pField->InstrumentID, instrument.toLatin1().data());
+    strcpy(pField->ExchangeID, exchangeID.toLatin1().data());
+
+    int id = nRequestID.fetchAndAddRelaxed(1);
+    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryInstrument, pUserApi, pField, id);
+    callTraderApi(traderApi, pField);
 
     return id;
 }
@@ -553,23 +659,111 @@ int CtpExecuter::qryPositionDetail(const QString &instrument)
 }
 
 /*!
- * \brief CtpExecuter::setPosition
- * 为该合约设置一个新的仓位, 如果与原仓位不同, 则执行操作
+ * \brief expired
+ * 判断是否过期(需要更新)
+ *
+ * \param time 过期时间
+ * \return 如果时间过期或过期时间无效返回true, 否则返回false
+ */
+static inline bool expired(const QDateTime &time)
+{
+    if (time.isNull() || !time.isValid()) {
+        return true;
+    }
+
+    if (QDateTime::currentDateTime() >= time) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/*!
+ * \brief CtpExecuter::getExpireTime
+ * 根据TradingDay生成过期时间(下午5点过期)
+ *
+ * \return 过期时间
+ */
+QDateTime CtpExecuter::getExpireTime() const
+{
+    QString tradingDay = pUserApi->GetTradingDay();
+    QDateTime expireTime = QDateTime::fromString(tradingDay, "yyyyMMdd");
+    if (expireTime.isValid()) {
+        expireTime.setTime(QTime(17, 0));
+    }
+    return expireTime;
+}
+
+/*!
+ * \brief CtpExecuter::operate
+ * 操作合约(必要的话)使得其仓位与目标值一致
  *
  * \param instrument 合约代码
- * \param position 新仓位
  */
-void CtpExecuter::setPosition(const QString& instrument, int position)
+void CtpExecuter::operate(const QString &instrument, int new_position)
 {
-    qryDepthMarketData(instrument); // TODO 建立缓存机制, 不必每次查询
-    target_pos_map.insert(instrument, position);
+    const double high = instrument_upper_lower_map[instrument].first;
+    const double low = instrument_upper_lower_map[instrument].second;
 
-    int real_pos = getPosition(instrument);
-    if (real_pos != -INT_MAX) {
-        int pending_order_pos = getPendingOrderPosition(instrument);
-        if (real_pos + pending_order_pos != position) {
-            // 执行操作
+    int position = getPosition(instrument);
+    int pending_order_pos = getPendingOrderPosition(instrument);
+
+    if (position != -INT_MAX && pending_order_pos != -INT_MAX) {
+        if (position + pending_order_pos != new_position) {
+            if (pending_order_pos == 0) {   // TODO 必须所有order的未成交volume都为0
+                if (new_position >= 0 && position < 0) {
+                    insertLimitOrder(instrument, false, -position, high);
+                    position = 0;
+                } else if (new_position <= 0 && position > 0) {
+                    insertLimitOrder(instrument, false, -position, low);
+                    position = 0;
+                }
+
+                int diff = new_position - position;
+                if (diff != 0) {
+                    int absdiff = qAbs(new_position) - qAbs(position);
+
+                    if (diff < 0 && absdiff < 0) {
+                        insertLimitOrder(instrument, false, diff, low);
+                    } else if (diff < 0 && absdiff > 0) {
+                        insertLimitOrder(instrument, true, diff, low);
+                    } else if (diff > 0 && absdiff > 0) {
+                        insertLimitOrder(instrument, true, diff, high);
+                    } else if (diff > 0 && absdiff < 0) {
+                        insertLimitOrder(instrument, false, diff, high);
+                    }
+                }
+            }
         }
+    }
+}
+
+/*!
+ * \brief CtpExecuter::getTradingDay
+ * 获取交易日
+ *
+ * \return 交易日(YYYYMMDD)
+ */
+QString CtpExecuter::getTradingDay() const
+{
+    return pUserApi->GetTradingDay();
+}
+
+/*!
+ * \brief CtpExecuter::setPosition
+ * 为该合约设置一个新的目标仓位, 如果与原仓位不同, 则执行相应操作以达成目标
+ *
+ * \param instrument 合约代码
+ * \param new_position 新目标仓位
+ */
+void CtpExecuter::setPosition(const QString& instrument, int new_position)
+{
+    target_pos_map.insert(instrument, new_position);
+    if (expired(instrument_expire_time_map[instrument])) {
+        qryDepthMarketData(instrument);
+        // TODO postEvent, call operate() in customEvent()
+    } else {
+        operate(instrument, new_position);
     }
 }
 
@@ -582,10 +776,10 @@ void CtpExecuter::setPosition(const QString& instrument, int position)
  */
 int CtpExecuter::getPosition(const QString& instrument) const
 {
-    if (pos_update_time.isValid()) {
-        return real_pos_map.value(instrument);
-    } else {
+    if (pos_update_time.isNull()) {
         return -INT_MAX;
+    } else {
+        return yd_pos_map.value(instrument) + td_pos_map.value(instrument);
     }
 }
 
@@ -598,7 +792,7 @@ int CtpExecuter::getPosition(const QString& instrument) const
  */
 int CtpExecuter::getPendingOrderPosition(const QString &instrument) const
 {
-    if (!order_update_time.isValid()) {
+    if (expired(order_expire_time)) {
         return -INT_MAX;
     }
     int sum = 0;

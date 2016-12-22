@@ -8,9 +8,12 @@
       <arg name="instrument" type="s" direction="out"/>
       <arg name="volume" type="i" direction="out"/>
     </signal>
+    <method name="getTradingDay">
+      <arg type="s" direction="out"/>
+    </method>
     <method name="setPosition">
       <arg name="instrument" type="s" direction="in"/>
-      <arg name="position" type="i" direction="in"/>
+      <arg name="new_position" type="i" direction="in"/>
     </method>
     <method name="getPosition">
       <arg type="i" direction="out"/>

@@ -7,6 +7,7 @@
 #include <QMap>
 #include <QMutex>
 #include <QDateTime>
+#include <QPair>
 
 class CThostFtdcTraderApi;
 class CTradeHandler;
@@ -37,21 +38,28 @@ protected:
     int SessionID;
 
     QMap<QString, int> target_pos_map;
-    QMap<QString, int> real_pos_map;
+    QMap<QString, int> yd_pos_map;
+    QMap<QString, int> td_pos_map;
     QDateTime pos_update_time;
     QMultiMap<QString, Order> order_map;
-    QDateTime order_update_time;
+    QDateTime order_expire_time;
+
+    QMap<QString, QDateTime> instrument_expire_time_map;
+    QMap<QString, QPair<double, double>> instrument_upper_lower_map;
 
     void customEvent(QEvent *event) override;
 
     template<typename Fn>
     void callTraderApi(Fn &traderApi, void * ptr);
 
+private slots:
     int login();
     int qrySettlementInfo();
     int confirmSettlementInfo();
     int qrySettlementInfoConfirm();
     int qryTradingAccount();
+    int qryInstrumentCommissionRate(const QString &instrument = QString());
+    int qryInstrument(const QString &instrument = QString(), const QString &exchangeID = QString());
     int qryDepthMarketData(const QString &instrument = QString());
     int insertLimitOrder(const QString &instrument, bool open, int volume, double price);
     int cancelOrder(char* orderRef, int frontID, int sessionID, const QString &instrument);
@@ -60,11 +68,15 @@ protected:
     int qryPosition(const QString &instrument = QString());
     int qryPositionDetail(const QString &instrument = QString());
 
+    QDateTime getExpireTime() const;
+    void operate(const QString &instrument, int new_position);
+
 signals:
     void heartBeatWarning(int nTimeLapse);
     void dealMade(const QString& instrument, int volume);
 public slots:
-    void setPosition(const QString& instrument, int position);
+    QString getTradingDay() const;
+    void setPosition(const QString& instrument, int new_position);
     int getPosition(const QString& instrument) const;
     int getPendingOrderPosition(const QString &instrument) const;
     void quit();

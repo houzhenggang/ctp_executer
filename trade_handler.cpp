@@ -101,6 +101,16 @@ void CTradeHandler::OnRspQryTradingAccount(CThostFtdcTradingAccountField *pTradi
     handleSingleRsp<TradingAccountEvent>(pTradingAccount, pRspInfo, nRequestID);
 }
 
+void CTradeHandler::OnRspQryInstrumentCommissionRate(CThostFtdcInstrumentCommissionRateField *pInstrumentCommissionRate, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    handleMultiRsp<RspQryInstrumentCommissionRateEvent>(&instrumentCommissionRateList, pInstrumentCommissionRate, pRspInfo, nRequestID, bIsLast);
+}
+
+void CTradeHandler::OnRspQryInstrument(CThostFtdcInstrumentField *pInstrument, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    handleMultiRsp<RspQryInstrumentEvent>(&instrumentList, pInstrument, pRspInfo, nRequestID, bIsLast);
+}
+
 void CTradeHandler::OnRspQryDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
     Q_UNUSED(bIsLast);
