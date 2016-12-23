@@ -27,6 +27,7 @@
 #define RSP_QRY_TRADE           (QEvent::User + 19)
 #define RSP_QRY_POSITION        (QEvent::User + 20)
 #define RSP_QRY_POSITION_DETAIL (QEvent::User + 21)
+#define RSP_QRY_MAX_ORDER_VOL   (QEvent::User + 22)
 
 struct RspInfo {
     const int errorID;
@@ -80,7 +81,7 @@ class SettlementInfoEvent : public QEvent, public RspInfo {
 public:
     const QList<CThostFtdcSettlementInfoField> settlementInfoList;
 
-    SettlementInfoEvent(QList<CThostFtdcSettlementInfoField> list, int err, int id) :
+    SettlementInfoEvent(const QList<CThostFtdcSettlementInfoField> &list, int err, int id) :
         QEvent(QEvent::Type(RSP_SETTLEMENT_INFO)),
         RspInfo(err, id),
         settlementInfoList(list) {}
@@ -110,7 +111,7 @@ class RspQryInstrumentCommissionRateEvent : public QEvent, public RspInfo {
 public:
     const QList<CThostFtdcInstrumentCommissionRateField> instrumentCommissionRateList;
 
-    RspQryInstrumentCommissionRateEvent(QList<CThostFtdcInstrumentCommissionRateField> list, int err, int id) :
+    RspQryInstrumentCommissionRateEvent(const QList<CThostFtdcInstrumentCommissionRateField> &list, int err, int id) :
         QEvent(QEvent::Type(RSP_QRY_INSTRUMENT_CR)),
         RspInfo(err, id),
         instrumentCommissionRateList(list) {}
@@ -120,7 +121,7 @@ class RspQryInstrumentEvent : public QEvent, public RspInfo {
 public:
     const QList<CThostFtdcInstrumentField> instrumentList;
 
-    RspQryInstrumentEvent(QList<CThostFtdcInstrumentField> list, int err, int id) :
+    RspQryInstrumentEvent(const QList<CThostFtdcInstrumentField> &list, int err, int id) :
         QEvent(QEvent::Type(RSP_QRY_INSTRUMENT)),
         RspInfo(err, id),
         instrumentList(list) {}
@@ -128,12 +129,12 @@ public:
 
 class DepthMarketDataEvent : public QEvent, public RspInfo {
 public:
-    const CThostFtdcDepthMarketDataField depthMarketDataField;
+    const QList<CThostFtdcDepthMarketDataField> depthMarketDataList;
 
-    DepthMarketDataEvent(CThostFtdcDepthMarketDataField *pDepthDataField, int err, int id) :
+    DepthMarketDataEvent(const QList<CThostFtdcDepthMarketDataField> &list, int err, int id) :
         QEvent(QEvent::Type(RSP_DEPTH_MARKET_DATA)),
         RspInfo(err, id),
-        depthMarketDataField(*pDepthDataField) {}
+        depthMarketDataList(list) {}
 };
 
 class RspOrderInsertEvent : public QEvent, public RspInfo {
@@ -198,7 +199,7 @@ class QryOrderEvent : public QEvent, public RspInfo {
 public:
     const QList<CThostFtdcOrderField> orderList;
 
-    QryOrderEvent(QList<CThostFtdcOrderField> list, int err, int id) :
+    QryOrderEvent(const QList<CThostFtdcOrderField> &list, int err, int id) :
         QEvent(QEvent::Type(RSP_QRY_ORDER)),
         RspInfo(err, id),
         orderList(list) {}
@@ -208,7 +209,7 @@ class QryTradeEvent : public QEvent, public RspInfo {
 public:
     const QList<CThostFtdcTradeField> tradeList;
 
-    QryTradeEvent(QList<CThostFtdcTradeField> list, int err, int id) :
+    QryTradeEvent(const QList<CThostFtdcTradeField> &list, int err, int id) :
         QEvent(QEvent::Type(RSP_QRY_TRADE)),
         RspInfo(err, id),
         tradeList(list) {}
@@ -218,7 +219,7 @@ class PositionEvent : public QEvent, public RspInfo {
 public:
     const QList<CThostFtdcInvestorPositionField> positionList;
 
-    PositionEvent(QList<CThostFtdcInvestorPositionField> list, int err, int id) :
+    PositionEvent(const QList<CThostFtdcInvestorPositionField> &list, int err, int id) :
         QEvent(QEvent::Type(RSP_QRY_POSITION)),
         RspInfo(err, id),
         positionList(list) {}
@@ -228,10 +229,20 @@ class PositionDetailEvent : public QEvent, public RspInfo {
 public:
     const QList<CThostFtdcInvestorPositionDetailField> positionDetailList;
 
-    PositionDetailEvent(QList<CThostFtdcInvestorPositionDetailField> list, int err, int id) :
+    PositionDetailEvent(const QList<CThostFtdcInvestorPositionDetailField> &list, int err, int id) :
         QEvent(QEvent::Type(RSP_QRY_POSITION_DETAIL)),
         RspInfo(err, id),
         positionDetailList(list) {}
+};
+
+class QryMaxOrderVolumeEvent : public QEvent, public RspInfo {
+public:
+    const CThostFtdcQueryMaxOrderVolumeField maxOrderVolumeField;
+
+    QryMaxOrderVolumeEvent(CThostFtdcQueryMaxOrderVolumeField *pQueryMaxOrderVolume, int err, int id) :
+        QEvent(QEvent::Type(RSP_QRY_MAX_ORDER_VOL)),
+        RspInfo(err, id),
+        maxOrderVolumeField(*pQueryMaxOrderVolume) {}
 };
 
 class CTradeHandler : public CThostFtdcTraderSpi {
@@ -241,6 +252,7 @@ class CTradeHandler : public CThostFtdcTraderSpi {
     QList<CThostFtdcSettlementInfoField> settlementInfoList;
     QList<CThostFtdcInstrumentCommissionRateField> instrumentCommissionRateList;
     QList<CThostFtdcInstrumentField> instrumentList;
+    QList<CThostFtdcDepthMarketDataField> depthMarketDataList;
     QList<CThostFtdcOrderField> orderList;
     QList<CThostFtdcTradeField> tradeList;
     QList<CThostFtdcInvestorPositionField> positionList;
@@ -287,6 +299,7 @@ public:
 
     void OnRspQryInvestorPosition(CThostFtdcInvestorPositionField *pInvestorPosition, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
     void OnRspQryInvestorPositionDetail(CThostFtdcInvestorPositionDetailField *pInvestorPositionDetail, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+    void OnRspQueryMaxOrderVolume(CThostFtdcQueryMaxOrderVolumeField *pQueryMaxOrderVolume, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 };
 
 #endif // TRADE_HANDLER_H

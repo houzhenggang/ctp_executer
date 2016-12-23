@@ -49,8 +49,8 @@ protected:
 
     void customEvent(QEvent *event) override;
 
-    template<typename Fn>
-    void callTraderApi(Fn &traderApi, void * ptr);
+    template<typename Fn, typename T>
+    int callTraderApi(Fn pTraderApi, T * ptr);
 
 private slots:
     int login();
@@ -63,6 +63,7 @@ private slots:
     int qryDepthMarketData(const QString &instrument = QString());
     int insertLimitOrder(const QString &instrument, bool open, int volume, double price);
     int cancelOrder(char* orderRef, int frontID, int sessionID, const QString &instrument);
+    int qryMaxOrderVolume(const QString &instrument, bool buy, char offsetFlag);
     int qryOrder(const QString &instrument = QString());
     int qryTrade(const QString &instrument = QString());
     int qryPosition(const QString &instrument = QString());

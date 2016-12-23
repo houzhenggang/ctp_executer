@@ -2,7 +2,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#include <functional>
 #include <QSettings>
 #include <QtConcurrentRun>
 
@@ -165,11 +164,11 @@ void CtpExecuter::customEvent(QEvent *event)
     case RSP_DEPTH_MARKET_DATA:
     {
         auto *devent = static_cast<DepthMarketDataEvent*>(event);
-        QString instrument = devent->depthMarketDataField.InstrumentID;
-        double upperLimitPrice = devent->depthMarketDataField.UpperLimitPrice;
-        double lowerLimitPrice = devent->depthMarketDataField.LowerLimitPrice;
-        instrument_upper_lower_map.insert(instrument, qMakePair(upperLimitPrice, lowerLimitPrice));
-        instrument_expire_time_map.insert(instrument, getExpireTime());
+        foreach (const auto &item, devent->depthMarketDataList) {
+            QString instrument = item.InstrumentID;
+            instrument_upper_lower_map.insert(instrument, qMakePair(item.UpperLimitPrice, item.LowerLimitPrice));
+            instrument_expire_time_map.insert(instrument, getExpireTime());
+        }
     }
         break;
     case RSP_ORDER_INSERT:
@@ -292,6 +291,12 @@ void CtpExecuter::customEvent(QEvent *event)
         pos_update_time = QDateTime::currentDateTime();
     }
         break;
+    case RSP_QRY_MAX_ORDER_VOL:
+    {
+        auto *qmevent = static_cast<QryMaxOrderVolumeEvent*>(event);
+        qDebug() << qmevent->maxOrderVolumeField.InstrumentID << qmevent->maxOrderVolumeField.MaxVolume;
+    }
+        break;
     default:
         QObject::customEvent(event);
         break;
@@ -300,21 +305,23 @@ void CtpExecuter::customEvent(QEvent *event)
 
 /*!
  * \brief CtpExecuter::callTraderApi
- * 尝试调用traderApi, 如果失败(返回值不是0),
+ * 尝试调用pTraderApi, 如果失败(返回值不是0),
  * 就在一个新线程里反复调用traderApi, 直至成功
  *
- * \param traderApi 无参函数对象
- * \param ptr 成功调用traderApi或超时之后释放
+ * \param pTraderApi CThostFtdcTraderApi类的成员函数指针
+ * \param pField pTraderApi函数的第一个参数，成功调用pTraderApi或超时之后释放
  */
-template<typename Fn>
-void CtpExecuter::callTraderApi(Fn &traderApi, void * ptr)
+template<typename Fn, typename T>
+int CtpExecuter::callTraderApi(Fn pTraderApi, T * pField)
 {
+    int id = nRequestID.fetchAndAddRelaxed(1);
+
     if (traderApiMutex.tryLock()) {
-        int ret = traderApi();
+        int ret = (pUserApi->*pTraderApi)(pField, id);
         traderApiMutex.unlock();
         if (ret == 0) {
-            free(ptr);
-            return;
+            free(pField);
+            return id;
         }
     }
 
@@ -323,14 +330,16 @@ void CtpExecuter::callTraderApi(Fn &traderApi, void * ptr)
         while (count_down-- > 0) {
             _sleep(400 - count_down * 2);   // TODO 改进退避算法
             traderApiMutex.lock();
-            int ret = traderApi();
+            int ret = (pUserApi->*pTraderApi)(pField, id);
             traderApiMutex.unlock();
             if (ret == 0) {
                 break;
             }
         }
-        free(ptr);
+        free(pField);
     });
+
+    return id;
 }
 
 /*!
@@ -363,16 +372,12 @@ int CtpExecuter::login()
  */
 int CtpExecuter::qrySettlementInfo()
 {
-    auto *pInfoField = (CThostFtdcQrySettlementInfoField*) malloc(sizeof (CThostFtdcQrySettlementInfoField));
+    auto *pInfoField = (CThostFtdcQrySettlementInfoField*) malloc(sizeof(CThostFtdcQrySettlementInfoField));
     memset(pInfoField, 0, sizeof (CThostFtdcQrySettlementInfoField));
     strcpy(pInfoField->BrokerID, c_brokerID);
     strcpy(pInfoField->InvestorID, c_userID);
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQrySettlementInfo, pUserApi, pInfoField, id);
-    callTraderApi(traderApi, pInfoField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQrySettlementInfo, pInfoField);
 }
 
 /*!
@@ -404,16 +409,12 @@ int CtpExecuter::confirmSettlementInfo()
  */
 int CtpExecuter::qrySettlementInfoConfirm()
 {
-    auto *pConfirmField = (CThostFtdcQrySettlementInfoConfirmField*) malloc(sizeof (CThostFtdcQrySettlementInfoConfirmField));
+    auto *pConfirmField = (CThostFtdcQrySettlementInfoConfirmField*) malloc(sizeof(CThostFtdcQrySettlementInfoConfirmField));
     memset(pConfirmField, 0, sizeof (CThostFtdcQrySettlementInfoConfirmField));
     strcpy(pConfirmField->BrokerID, c_brokerID);
     strcpy(pConfirmField->InvestorID, c_userID);
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQrySettlementInfoConfirm, pUserApi, pConfirmField, id);
-    callTraderApi(traderApi, pConfirmField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQrySettlementInfoConfirm, pConfirmField);
 }
 
 /*!
@@ -424,16 +425,12 @@ int CtpExecuter::qrySettlementInfoConfirm()
  */
 int CtpExecuter::qryTradingAccount()
 {
-    auto *pAccountField = (CThostFtdcQryTradingAccountField*) malloc(sizeof (CThostFtdcQryTradingAccountField));
+    auto *pAccountField = (CThostFtdcQryTradingAccountField*) malloc(sizeof(CThostFtdcQryTradingAccountField));
     memset(pAccountField, 0, sizeof (CThostFtdcQryTradingAccountField));
     strcpy(pAccountField->BrokerID, c_brokerID);
     strcpy(pAccountField->InvestorID, c_userID);
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryTradingAccount, pUserApi, pAccountField, id);
-    callTraderApi(traderApi, pAccountField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryTradingAccount, pAccountField);
 }
 
 /*!
@@ -445,16 +442,12 @@ int CtpExecuter::qryTradingAccount()
  */
 int CtpExecuter::qryInstrumentCommissionRate(const QString &instrument)
 {
-    auto * pField = (CThostFtdcQryInstrumentCommissionRateField*) malloc (sizeof(CThostFtdcQryInstrumentCommissionRateField));
+    auto * pField = (CThostFtdcQryInstrumentCommissionRateField*) malloc(sizeof(CThostFtdcQryInstrumentCommissionRateField));
     strcpy(pField->BrokerID, c_brokerID);
     strcpy(pField->InvestorID, c_userID);
     strcpy(pField->InstrumentID, instrument.toLatin1().data());
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryInstrumentCommissionRate, pUserApi, pField, id);
-    callTraderApi(traderApi, pField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryInstrumentCommissionRate, pField);
 }
 
 /*!
@@ -471,11 +464,7 @@ int CtpExecuter::qryInstrument(const QString &instrument, const QString &exchang
     strcpy(pField->InstrumentID, instrument.toLatin1().data());
     strcpy(pField->ExchangeID, exchangeID.toLatin1().data());
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryInstrument, pUserApi, pField, id);
-    callTraderApi(traderApi, pField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryInstrument, pField);
 }
 
 /*!
@@ -490,11 +479,7 @@ int CtpExecuter::qryDepthMarketData(const QString &instrument)
     auto *pField = (CThostFtdcQryDepthMarketDataField*) malloc(sizeof(CThostFtdcQryDepthMarketDataField));
     strcpy(pField->InstrumentID, instrument.toLatin1().data());
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryDepthMarketData, pUserApi, pField, id);
-    callTraderApi(traderApi, pField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryDepthMarketData, pField);
 }
 
 /*!
@@ -573,6 +558,27 @@ int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const Q
 }
 
 /*!
+ * \brief CtpExecuter::qryMaxOrderVolume
+ * 查询最大报单数量
+ *
+ * \param instrument 合约代码
+ * \return nRequestID
+ */
+int CtpExecuter::qryMaxOrderVolume(const QString &instrument, bool buy, char offsetFlag)
+{
+    auto *pField = (CThostFtdcQueryMaxOrderVolumeField *) malloc(sizeof(CThostFtdcQueryMaxOrderVolumeField));
+    memset(pField, 0, sizeof(CThostFtdcQueryMaxOrderVolumeField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
+    strcpy(pField->InstrumentID, instrument.toLatin1().data());
+    pField->Direction = buy ? THOST_FTDC_D_Buy : THOST_FTDC_D_Sell;
+    pField->OffsetFlag = offsetFlag;
+    pField->HedgeFlag = THOST_FTDC_HF_Speculation;
+
+    return callTraderApi(&CThostFtdcTraderApi::ReqQueryMaxOrderVolume, pField);
+}
+
+/*!
  * \brief CtpExecuter::qryOrder
  * 查询报单
  *
@@ -587,11 +593,7 @@ int CtpExecuter::qryOrder(const QString &instrument)
     strcpy(pField->InvestorID, c_userID);
     strcpy(pField->InstrumentID, instrument.toLatin1().data());
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryOrder, pUserApi, pField, id);
-    callTraderApi(traderApi, pField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryOrder, pField);
 }
 
 /*!
@@ -609,11 +611,7 @@ int CtpExecuter::qryTrade(const QString &instrument)
     strcpy(pField->InvestorID, c_userID);
     strcpy(pField->InstrumentID, instrument.toLatin1().data());
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryTrade, pUserApi, pField, id);
-    callTraderApi(traderApi, pField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryTrade, pField);
 }
 
 /*!
@@ -630,11 +628,7 @@ int CtpExecuter::qryPosition(const QString &instrument)
     strcpy(pField->InvestorID, c_userID);
     strcpy(pField->InstrumentID, instrument.toLatin1().data());
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryInvestorPosition, pUserApi, pField, id);
-    callTraderApi(traderApi, pField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryInvestorPosition, pField);
 }
 
 /*!
@@ -651,11 +645,7 @@ int CtpExecuter::qryPositionDetail(const QString &instrument)
     strcpy(pField->InvestorID, c_userID);
     strcpy(pField->InstrumentID, instrument.toLatin1().data());
 
-    int id = nRequestID.fetchAndAddRelaxed(1);
-    auto traderApi = std::bind(&CThostFtdcTraderApi::ReqQryInvestorPositionDetail, pUserApi, pField, id);
-    callTraderApi(traderApi, pField);
-
-    return id;
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryInvestorPositionDetail, pField);
 }
 
 /*!

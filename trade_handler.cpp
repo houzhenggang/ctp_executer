@@ -113,8 +113,7 @@ void CTradeHandler::OnRspQryInstrument(CThostFtdcInstrumentField *pInstrument, C
 
 void CTradeHandler::OnRspQryDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-    Q_UNUSED(bIsLast);
-    handleSingleRsp<DepthMarketDataEvent>(pDepthMarketData, pRspInfo, nRequestID);
+    handleMultiRsp<DepthMarketDataEvent>(&depthMarketDataList, pDepthMarketData, pRspInfo, nRequestID, bIsLast);
 }
 
 void CTradeHandler::OnRspOrderInsert(CThostFtdcInputOrderField *pInputOrder, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
@@ -167,4 +166,10 @@ void CTradeHandler::OnRspQryInvestorPosition(CThostFtdcInvestorPositionField *pI
 void CTradeHandler::OnRspQryInvestorPositionDetail(CThostFtdcInvestorPositionDetailField *pInvestorPositionDetail, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
     handleMultiRsp<PositionDetailEvent>(&positionDetailList, pInvestorPositionDetail, pRspInfo, nRequestID, bIsLast);
+}
+
+void CTradeHandler::OnRspQueryMaxOrderVolume(CThostFtdcQueryMaxOrderVolumeField *pQueryMaxOrderVolume, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    Q_UNUSED(bIsLast);
+    handleSingleRsp<QryMaxOrderVolumeEvent>(pQueryMaxOrderVolume, pRspInfo, nRequestID);
 }
