@@ -710,18 +710,15 @@ void CtpExecuter::operate(const QString &instrument, int new_position)
                 }
 
                 int diff = new_position - position;
-                if (diff != 0) {
-                    int absdiff = qAbs(new_position) - qAbs(position);
 
-                    if (diff < 0 && absdiff < 0) {
-                        insertLimitOrder(instrument, false, diff, low);
-                    } else if (diff < 0 && absdiff > 0) {
-                        insertLimitOrder(instrument, true, diff, low);
-                    } else if (diff > 0 && absdiff > 0) {
-                        insertLimitOrder(instrument, true, diff, high);
-                    } else if (diff > 0 && absdiff < 0) {
-                        insertLimitOrder(instrument, false, diff, high);
-                    }
+                if (diff < 0 && new_position > 0) {
+                    insertLimitOrder(instrument, false, diff, low);
+                } else if (diff < 0 && 0 >= position) {
+                    insertLimitOrder(instrument, true, diff, low);
+                } else if (diff > 0 && 0 <= position) {
+                    insertLimitOrder(instrument, true, diff, high);
+                } else if (diff > 0 && new_position < 0) {
+                    insertLimitOrder(instrument, false, diff, high);
                 }
             }
         }
