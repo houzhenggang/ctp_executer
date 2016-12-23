@@ -49,8 +49,8 @@ protected:
 
     void customEvent(QEvent *event) override;
 
-    template<typename Fn, typename T>
-    int callTraderApi(Fn pTraderApi, T * ptr);
+    template<typename T>
+    int callTraderApi(int (CThostFtdcTraderApi::* pTraderApi)(T *,int), T * pField);
 
 private slots:
     int login();

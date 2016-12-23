@@ -306,13 +306,13 @@ void CtpExecuter::customEvent(QEvent *event)
 /*!
  * \brief CtpExecuter::callTraderApi
  * 尝试调用pTraderApi, 如果失败(返回值不是0),
- * 就在一个新线程里反复调用traderApi, 直至成功
+ * 就在一个新线程里反复调用pTraderApi, 直至成功
  *
  * \param pTraderApi CThostFtdcTraderApi类的成员函数指针
  * \param pField pTraderApi函数的第一个参数，成功调用pTraderApi或超时之后释放
  */
-template<typename Fn, typename T>
-int CtpExecuter::callTraderApi(Fn pTraderApi, T * pField)
+template<typename T>
+int CtpExecuter::callTraderApi(int (CThostFtdcTraderApi::* pTraderApi)(T *,int), T * pField)
 {
     int id = nRequestID.fetchAndAddRelaxed(1);
 
