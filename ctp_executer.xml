@@ -19,7 +19,7 @@
       <arg type="i" direction="out"/>
       <arg name="instrument" type="s" direction="in"/>
     </method>
-    <method name="getPendingOrderPosition">
+    <method name="getPendingOrderVolume">
       <arg type="i" direction="out"/>
       <arg name="instrument" type="s" direction="in"/>
     </method>

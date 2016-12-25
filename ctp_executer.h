@@ -79,7 +79,7 @@ public slots:
     QString getTradingDay() const;
     void setPosition(const QString& instrument, int new_position);
     int getPosition(const QString& instrument) const;
-    int getPendingOrderPosition(const QString &instrument) const;
+    int getPendingOrderVolume(const QString &instrument) const;
     void quit();
 };
 

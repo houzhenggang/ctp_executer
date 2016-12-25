@@ -131,6 +131,10 @@ void CtpExecuter::customEvent(QEvent *event)
         }
     }
         break;
+    case RSP_USER_LOGOUT:
+        break;
+    case RSP_ERROR:
+        break;
     case RSP_SETTLEMENT_INFO:
     {
         auto *sevent = static_cast<SettlementInfoEvent*>(event);
@@ -372,12 +376,12 @@ int CtpExecuter::login()
  */
 int CtpExecuter::qrySettlementInfo()
 {
-    auto *pInfoField = (CThostFtdcQrySettlementInfoField*) malloc(sizeof(CThostFtdcQrySettlementInfoField));
-    memset(pInfoField, 0, sizeof (CThostFtdcQrySettlementInfoField));
-    strcpy(pInfoField->BrokerID, c_brokerID);
-    strcpy(pInfoField->InvestorID, c_userID);
+    auto *pField = (CThostFtdcQrySettlementInfoField*) malloc(sizeof(CThostFtdcQrySettlementInfoField));
+    memset(pField, 0, sizeof (CThostFtdcQrySettlementInfoField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
 
-    return callTraderApi(&CThostFtdcTraderApi::ReqQrySettlementInfo, pInfoField);
+    return callTraderApi(&CThostFtdcTraderApi::ReqQrySettlementInfo, pField);
 }
 
 /*!
@@ -409,12 +413,12 @@ int CtpExecuter::confirmSettlementInfo()
  */
 int CtpExecuter::qrySettlementInfoConfirm()
 {
-    auto *pConfirmField = (CThostFtdcQrySettlementInfoConfirmField*) malloc(sizeof(CThostFtdcQrySettlementInfoConfirmField));
-    memset(pConfirmField, 0, sizeof (CThostFtdcQrySettlementInfoConfirmField));
-    strcpy(pConfirmField->BrokerID, c_brokerID);
-    strcpy(pConfirmField->InvestorID, c_userID);
+    auto *pField = (CThostFtdcQrySettlementInfoConfirmField*) malloc(sizeof(CThostFtdcQrySettlementInfoConfirmField));
+    memset(pField, 0, sizeof (CThostFtdcQrySettlementInfoConfirmField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
 
-    return callTraderApi(&CThostFtdcTraderApi::ReqQrySettlementInfoConfirm, pConfirmField);
+    return callTraderApi(&CThostFtdcTraderApi::ReqQrySettlementInfoConfirm, pField);
 }
 
 /*!
@@ -425,12 +429,12 @@ int CtpExecuter::qrySettlementInfoConfirm()
  */
 int CtpExecuter::qryTradingAccount()
 {
-    auto *pAccountField = (CThostFtdcQryTradingAccountField*) malloc(sizeof(CThostFtdcQryTradingAccountField));
-    memset(pAccountField, 0, sizeof (CThostFtdcQryTradingAccountField));
-    strcpy(pAccountField->BrokerID, c_brokerID);
-    strcpy(pAccountField->InvestorID, c_userID);
+    auto *pField = (CThostFtdcQryTradingAccountField*) malloc(sizeof(CThostFtdcQryTradingAccountField));
+    memset(pField, 0, sizeof (CThostFtdcQryTradingAccountField));
+    strcpy(pField->BrokerID, c_brokerID);
+    strcpy(pField->InvestorID, c_userID);
 
-    return callTraderApi(&CThostFtdcTraderApi::ReqQryTradingAccount, pAccountField);
+    return callTraderApi(&CThostFtdcTraderApi::ReqQryTradingAccount, pField);
 }
 
 /*!
@@ -696,7 +700,7 @@ void CtpExecuter::operate(const QString &instrument, int new_position)
     const double low = instrument_upper_lower_map[instrument].second;
 
     int position = getPosition(instrument);
-    int pending_order_pos = getPendingOrderPosition(instrument);
+    int pending_order_pos = getPendingOrderVolume(instrument);
 
     if (position != -INT_MAX && pending_order_pos != -INT_MAX) {
         if (position + pending_order_pos != new_position) {
@@ -777,7 +781,7 @@ int CtpExecuter::getPosition(const QString& instrument) const
  * \param instrument 被查询的合约代码
  * \return 该合约未成交订单的仓位之和, 如果查询结果已经过期返回-INT_MAX
  */
-int CtpExecuter::getPendingOrderPosition(const QString &instrument) const
+int CtpExecuter::getPendingOrderVolume(const QString &instrument) const
 {
     if (expired(order_expire_time)) {
         return -INT_MAX;
@@ -789,11 +793,7 @@ int CtpExecuter::getPendingOrderPosition(const QString &instrument) const
                 order.status == THOST_FTDC_OST_NoTradeQueueing ||
                 order.status == THOST_FTDC_OST_Unknown)
         {
-            int position = order.vol_remain;
-            if (order.direction == THOST_FTDC_D_Sell) {
-                position *= -1;
-            }
-            sum += position;
+            sum += order.remainVolume();
         }
     }
     return sum;
