@@ -12,6 +12,7 @@
 class CThostFtdcTraderApi;
 class CTradeHandler;
 class Order;
+template<class T> class Expires;
 
 class CtpExecuter : public QObject
 {
@@ -41,11 +42,8 @@ protected:
     QMap<QString, int> yd_pos_map;
     QMap<QString, int> td_pos_map;
     QDateTime pos_update_time;
-    QMultiMap<QString, Order> order_map;
-    QDateTime order_expire_time;
-
-    QMap<QString, QDateTime> instrument_expire_time_map;
-    QMap<QString, QPair<double, double>> instrument_upper_lower_map;
+    QMultiMap<QString, Expires<Order>> order_map;
+    QMap<QString, Expires<QPair<double, double>>> upper_lower_limit_map;
 
     void customEvent(QEvent *event) override;
 

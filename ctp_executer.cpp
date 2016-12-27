@@ -9,6 +9,7 @@
 #include "ctp_executer_adaptor.h"
 #include "trade_handler.h"
 #include "order.h"
+#include "expires.h"
 
 #ifdef Q_OS_WIN
 #include <Windows.h>
@@ -170,8 +171,7 @@ void CtpExecuter::customEvent(QEvent *event)
         auto *devent = static_cast<DepthMarketDataEvent*>(event);
         foreach (const auto &item, devent->depthMarketDataList) {
             QString instrument = item.InstrumentID;
-            instrument_upper_lower_map.insert(instrument, qMakePair(item.UpperLimitPrice, item.LowerLimitPrice));
-            instrument_expire_time_map.insert(instrument, getExpireTime());
+            upper_lower_limit_map.insert(instrument, make_expires(qMakePair(item.UpperLimitPrice, item.LowerLimitPrice), getExpireTime()));
         }
     }
         break;
@@ -236,10 +236,9 @@ void CtpExecuter::customEvent(QEvent *event)
         auto *qoevent = static_cast<QryOrderEvent*>(event);
         order_map.clear();
         foreach (const auto &item, qoevent->orderList) {
-            order_map.insert(item.InstrumentID, item);
+            order_map.insert(item.InstrumentID, Expires<Order>(item, getExpireTime()));
             qDebug() << item.OrderStatus << QTextCodec::codecForName("GBK")->toUnicode(item.StatusMsg);
         }
-        order_expire_time = getExpireTime();
     }
         break;
     case RSP_QRY_TRADE:
@@ -653,26 +652,6 @@ int CtpExecuter::qryPositionDetail(const QString &instrument)
 }
 
 /*!
- * \brief expired
- * 判断是否过期(需要更新)
- *
- * \param time 过期时间
- * \return 如果时间过期或过期时间无效返回true, 否则返回false
- */
-static inline bool expired(const QDateTime &time)
-{
-    if (time.isNull() || !time.isValid()) {
-        return true;
-    }
-
-    if (QDateTime::currentDateTime() >= time) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-/*!
  * \brief CtpExecuter::getExpireTime
  * 根据TradingDay生成过期时间(下午5点过期)
  *
@@ -696,13 +675,13 @@ QDateTime CtpExecuter::getExpireTime() const
  */
 void CtpExecuter::operate(const QString &instrument, int new_position)
 {
-    const double high = instrument_upper_lower_map[instrument].first;
-    const double low = instrument_upper_lower_map[instrument].second;
+    const double high = upper_lower_limit_map[instrument].originalValue().first;
+    const double low = upper_lower_limit_map[instrument].originalValue().second;
 
     int position = getPosition(instrument);
     int pending_order_pos = getPendingOrderVolume(instrument);
 
-    if (position != -INT_MAX && pending_order_pos != -INT_MAX) {
+    if (position != -INT_MAX) {
         if (position + pending_order_pos != new_position) {
             if (pending_order_pos == 0) {   // TODO 必须所有order的未成交volume都为0
                 if (new_position >= 0 && position < 0) {
@@ -750,7 +729,7 @@ QString CtpExecuter::getTradingDay() const
 void CtpExecuter::setPosition(const QString& instrument, int new_position)
 {
     target_pos_map.insert(instrument, new_position);
-    if (expired(instrument_expire_time_map[instrument])) {
+    if (upper_lower_limit_map[instrument].expired()) {
         qryDepthMarketData(instrument);
         // TODO postEvent, call operate() in customEvent()
     } else {
@@ -777,18 +756,20 @@ int CtpExecuter::getPosition(const QString& instrument) const
 /*!
  * \brief CtpExecuter::getPendingOrderPosition
  * 获取该合约未成交订单的仓位
+ * 该函数必须在成功登陆并更新订单表之后调用
  *
  * \param instrument 被查询的合约代码
- * \return 该合约未成交订单的仓位之和, 如果查询结果已经过期返回-INT_MAX
+ * \return 该合约未成交订单的仓位之和
  */
 int CtpExecuter::getPendingOrderVolume(const QString &instrument) const
 {
-    if (expired(order_expire_time)) {
-        return -INT_MAX;
-    }
     int sum = 0;
     const auto orderList = order_map.values(instrument);
-    foreach (const auto& order, orderList) {
+    foreach (const auto& item, orderList) {
+        if (item.expired()) {
+            continue;
+        }
+        auto order = item.originalValue();
         if (order.status == THOST_FTDC_OST_PartTradedQueueing ||
                 order.status == THOST_FTDC_OST_NoTradeQueueing ||
                 order.status == THOST_FTDC_OST_Unknown)

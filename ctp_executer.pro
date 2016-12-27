@@ -20,7 +20,8 @@ HEADERS += \
     ThostFtdcUserApiDataType.h \
     ThostFtdcUserApiStruct.h \
     trade_handler.h \
-    order.h
+    order.h \
+    expires.h
 
 DBUS_ADAPTORS += ctp_executer.xml
 
