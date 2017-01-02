@@ -17,7 +17,7 @@
 
 /*!
  * \brief _sleep
- * 暂停当前线程. 代码拷贝自QTestLib模块, 不要在主线程中调用.
+ * 暂停当前线程. 代码参考QTestLib模块, 不要在主线程中调用.
  *
  * \param ms 暂停时长(<932毫秒)
  */
@@ -438,7 +438,7 @@ int CtpExecuter::qryTradingAccount()
 
 /*!
  * \brief CtpExecuter::qryInstrumentCommissionRate
- * 查询手续费率
+ * 发送查询手续费率请求
  *
  * \param instrument 合约代码(为空代表所有持仓合约)
  * \return nRequestID
@@ -455,7 +455,7 @@ int CtpExecuter::qryInstrumentCommissionRate(const QString &instrument)
 
 /*!
  * \brief CtpExecuter::qryInstrument
- * 查询合约
+ * 发送查询合约请求
  *
  * \param instrument 合约代码(为空代表所有合约)
  * \param exchangeID 交易所代码(为空代表所有交易所)
@@ -486,7 +486,7 @@ int CtpExecuter::qryDepthMarketData(const QString &instrument)
 }
 
 /*!
- * \brief CtpExecuter::limitOrder
+ * \brief CtpExecuter::insertLimitOrder
  * 下限价单
  *
  * \param instrument 合约代码
@@ -562,7 +562,7 @@ int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const Q
 
 /*!
  * \brief CtpExecuter::qryMaxOrderVolume
- * 查询最大报单数量
+ * 发送查询最大报单数量请求
  *
  * \param instrument 合约代码
  * \return nRequestID
@@ -583,7 +583,7 @@ int CtpExecuter::qryMaxOrderVolume(const QString &instrument, bool buy, char off
 
 /*!
  * \brief CtpExecuter::qryOrder
- * 查询报单
+ * 发送查询报单请求
  *
  * \param instrument 合约代码
  * \return nRequestID
@@ -600,8 +600,8 @@ int CtpExecuter::qryOrder(const QString &instrument)
 }
 
 /*!
- * \brief CtpExecuter::qryOrder
- * 查询成交
+ * \brief CtpExecuter::qryTrade
+ * 发送查询成交请求
  *
  * \param instrument 合约代码
  * \return nRequestID
@@ -619,7 +619,7 @@ int CtpExecuter::qryTrade(const QString &instrument)
 
 /*!
  * \brief CtpExecuter::qryPosition
- * 查询持仓
+ * 发送查询持仓请求
  *
  * \param instrument 合约代码
  * \return nRequestID
@@ -636,7 +636,7 @@ int CtpExecuter::qryPosition(const QString &instrument)
 
 /*!
  * \brief CtpExecuter::qryPositionDetail
- * 查询持仓明细
+ * 发送查询持仓明细请求
  *
  * \param instrument 合约代码
  * \return nRequestID
@@ -754,7 +754,7 @@ int CtpExecuter::getPosition(const QString& instrument) const
 }
 
 /*!
- * \brief CtpExecuter::getPendingOrderPosition
+ * \brief CtpExecuter::getPendingOrderVolume
  * 获取该合约未成交订单的仓位
  * 该函数必须在成功登陆并更新订单表之后调用
  *
