@@ -490,9 +490,9 @@ int CtpExecuter::qryDepthMarketData(const QString &instrument)
  * 下限价单
  *
  * \param instrument 合约代码
+ * \param open 开仓(true)/平仓(false)
+ * \param volume 手数(非零整数, 正数代表开多/平空, 负数代表开空/平多)
  * \param price 价格(限价, 不得超出涨跌停范围)
- * \param volume 手数(非零整数, 正数代表做多, 负数代表做空)
- * \param open 开仓(true)/平仓(false)标志
  * \return nRequestID
  */
 int CtpExecuter::insertLimitOrder(const QString &instrument, bool open, int volume, double price)
@@ -534,7 +534,7 @@ int CtpExecuter::insertLimitOrder(const QString &instrument, bool open, int volu
  * \brief CtpExecuter::cancelOrder
  * 撤单
  *
- * \param orderRef 报单饮用(TThostFtdcOrderRefType)
+ * \param orderRef 报单引用(TThostFtdcOrderRefType)
  * \param frontID 前置编号
  * \param sessionID 会话编号
  * \param instrument 合约代码
@@ -565,6 +565,8 @@ int CtpExecuter::cancelOrder(char* orderRef, int frontID, int sessionID, const Q
  * 发送查询最大报单数量请求
  *
  * \param instrument 合约代码
+ * \param buy 买卖方向
+ * \param offsetFlag 开平标志
  * \return nRequestID
  */
 int CtpExecuter::qryMaxOrderVolume(const QString &instrument, bool buy, char offsetFlag)
@@ -672,6 +674,7 @@ QDateTime CtpExecuter::getExpireTime() const
  * 操作合约(必要的话)使得其仓位与目标值一致
  *
  * \param instrument 合约代码
+ * \param new_position 新目标仓位
  */
 void CtpExecuter::operate(const QString &instrument, int new_position)
 {
